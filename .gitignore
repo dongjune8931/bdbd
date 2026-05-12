@@ -1,5 +1,8 @@
 .DS_Store
 
+# Markdown docs stay local
+*.md
+
 # Local tool state
 .claude/
 CLAUDE.md
