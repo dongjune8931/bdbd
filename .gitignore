@@ -1,0 +1,22 @@
+.DS_Store
+
+# Local tool state
+.claude/
+CLAUDE.md
+memory/
+
+# IDE
+.idea/
+
+# Terraform local state
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Go local cache
+bodybuddy-app/.gocache/

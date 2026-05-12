@@ -1,0 +1,21 @@
+# Git
+.git
+.gitignore
+
+# Go test artifacts
+**/*_test.go
+**/*.test
+.gocache
+
+# Docker
+docker-compose.yml
+deploy/
+
+# Docs & reports
+docs/
+test/
+*.md
+
+# Local env
+.env
+.env.*

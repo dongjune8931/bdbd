@@ -1,0 +1,21 @@
+# Stage 1: Build
+# golang:1.24-alpine is used for a lean build environment.
+FROM golang:1.24-alpine AS builder
+WORKDIR /app
+
+# Download dependencies first (layer cache optimisation).
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+# SERVICE_NAME must be provided at build time, e.g. --build-arg SERVICE_NAME=user-service
+ARG SERVICE_NAME
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/service ./cmd/${SERVICE_NAME}/
+
+# Stage 2: Runtime
+# distroless/static-debian12:nonroot has no shell, no package manager, and runs as uid 65532.
+# This minimises the attack surface and keeps the image under 25 MB.
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=builder /bin/service /service
+ENTRYPOINT ["/service"]
