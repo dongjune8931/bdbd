@@ -18,6 +18,9 @@ env:
 jobs:
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bodybuddy-app
 
     steps:
       - name: Checkout
@@ -26,7 +29,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: bodybuddy-app/go.mod
 
       - name: Download modules
         run: go mod download
@@ -42,13 +45,13 @@ jobs:
       matrix:
         include:
           - service: user-service
-            dockerfile: deploy/docker/Dockerfile.user-service
+            dockerfile: bodybuddy-app/deploy/docker/Dockerfile.user-service
           - service: score-service
-            dockerfile: deploy/docker/Dockerfile.score-service
+            dockerfile: bodybuddy-app/deploy/docker/Dockerfile.score-service
           - service: analysis-worker
-            dockerfile: deploy/docker/Dockerfile.analysis-worker
+            dockerfile: bodybuddy-app/deploy/docker/Dockerfile.analysis-worker
           - service: notification-worker
-            dockerfile: deploy/docker/Dockerfile.notification-worker
+            dockerfile: bodybuddy-app/deploy/docker/Dockerfile.notification-worker
 
     steps:
       - name: Checkout
@@ -87,8 +90,7 @@ jobs:
       - name: Build image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ${{ matrix.dockerfile }}
+          context: ./bodybuddy-app
+          file: ./${{ matrix.dockerfile }}
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: ${{ steps.meta.outputs.tags }}
-
