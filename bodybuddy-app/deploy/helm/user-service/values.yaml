@@ -19,6 +19,11 @@ service:
   port: 80
   targetPort: 8080
 
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+
 ingress:
   enabled: true
   className: alb

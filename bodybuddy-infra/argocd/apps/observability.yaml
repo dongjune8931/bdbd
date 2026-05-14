@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability
+  namespace: bodybuddy-system
+  labels:
+    app.kubernetes.io/part-of: bodybuddy
+    app.kubernetes.io/component: observability
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: bodybuddy
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 72.6.2
+    helm:
+      values: |
+        grafana:
+          enabled: true
+          adminPassword: bodybuddy-grafana-admin
+          service:
+            type: ClusterIP
+          ingress:
+            enabled: false
+        prometheus:
+          prometheusSpec:
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            retention: 7d
+        alertmanager:
+          enabled: true
+        kubeEtcd:
+          enabled: false
+        defaultRules:
+          create: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bodybuddy-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
