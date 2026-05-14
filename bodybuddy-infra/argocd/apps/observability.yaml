@@ -32,6 +32,14 @@ spec:
           enabled: true
         kubeEtcd:
           enabled: false
+        kubeProxy:
+          enabled: false
+        coreDns:
+          enabled: false
+        kubeScheduler:
+          enabled: false
+        kubeControllerManager:
+          enabled: false
         defaultRules:
           create: true
   destination:
