@@ -30,6 +30,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: bodybuddy-app/go.mod
+          cache-dependency-path: bodybuddy-app/go.sum
 
       - name: Download modules
         run: go mod download
