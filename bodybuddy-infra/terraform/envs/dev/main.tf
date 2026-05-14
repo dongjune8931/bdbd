@@ -9,7 +9,7 @@ locals {
     Environment = var.environment
     Project     = local.project
     ManagedBy   = "terraform"
-    Owner       = "<GITHUB_USER>"
+    Owner       = "dongjune8931"
   }
 }
 
@@ -87,37 +87,39 @@ module "karpenter" {
 module "rds" {
   source = "../../modules/rds"
 
-  identifier                = var.db_identifier
-  database_name             = var.db_name
-  engine_version            = var.db_engine_version
-  instance_class            = var.db_instance_class
-  allocated_storage         = var.db_allocated_storage
-  max_allocated_storage     = var.db_max_allocated_storage
-  multi_az                  = var.db_multi_az
-  backup_retention_period   = var.db_backup_retention_period
-  deletion_protection       = var.db_deletion_protection
-  apply_immediately         = true
-  subnet_ids                = module.vpc.private_subnet_ids
-  vpc_id                    = module.vpc.vpc_id
-  allowed_cidr_blocks       = [var.vpc_cidr]
-  cluster_security_group_id = module.eks.cluster_security_group_id
-  tags                      = local.common_tags
+  identifier                            = var.db_identifier
+  database_name                         = var.db_name
+  engine_version                        = var.db_engine_version
+  instance_class                        = var.db_instance_class
+  allocated_storage                     = var.db_allocated_storage
+  max_allocated_storage                 = var.db_max_allocated_storage
+  multi_az                              = var.db_multi_az
+  backup_retention_period               = var.db_backup_retention_period
+  deletion_protection                   = var.db_deletion_protection
+  apply_immediately                     = true
+  subnet_ids                            = module.vpc.private_subnet_ids
+  vpc_id                                = module.vpc.vpc_id
+  allowed_cidr_blocks                   = [var.vpc_cidr]
+  cluster_security_group_id             = module.eks.cluster_security_group_id
+  enable_cluster_security_group_ingress = true
+  tags                                  = local.common_tags
 }
 
 module "elasticache" {
   source = "../../modules/elasticache"
 
-  replication_group_id       = var.cache_replication_group_id
-  description                = "Redis cache for BodyBuddy dev"
-  node_type                  = var.cache_node_type
-  engine_version             = var.cache_engine_version
-  num_cache_clusters         = 1
-  subnet_ids                 = module.vpc.private_subnet_ids
-  vpc_id                     = module.vpc.vpc_id
-  allowed_cidr_blocks        = [var.vpc_cidr]
-  cluster_security_group_id  = module.eks.cluster_security_group_id
-  apply_immediately          = true
-  automatic_failover_enabled = false
-  multi_az_enabled           = false
-  tags                       = local.common_tags
+  replication_group_id                  = var.cache_replication_group_id
+  description                           = "Redis cache for BodyBuddy dev"
+  node_type                             = var.cache_node_type
+  engine_version                        = var.cache_engine_version
+  num_cache_clusters                    = 1
+  subnet_ids                            = module.vpc.private_subnet_ids
+  vpc_id                                = module.vpc.vpc_id
+  allowed_cidr_blocks                   = [var.vpc_cidr]
+  cluster_security_group_id             = module.eks.cluster_security_group_id
+  enable_cluster_security_group_ingress = true
+  apply_immediately                     = true
+  automatic_failover_enabled            = false
+  multi_az_enabled                      = false
+  tags                                  = local.common_tags
 }

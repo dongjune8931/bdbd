@@ -30,10 +30,10 @@ output "oidc_provider_arn" {
 
 output "bootstrap_node_group_name" {
   description = "Bootstrap managed node group name."
-  value       = module.eks.eks_managed_node_groups["bootstrap"].node_group_name
+  value       = try(module.eks.eks_managed_node_groups["bootstrap"].node_group_id, null)
 }
 
 output "bootstrap_node_group_iam_role_arn" {
   description = "IAM role ARN for the bootstrap managed node group."
-  value       = module.eks.eks_managed_node_groups["bootstrap"].iam_role_arn
+  value       = try(module.eks.eks_managed_node_groups["bootstrap"].iam_role_arn, null)
 }

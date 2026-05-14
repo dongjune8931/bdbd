@@ -44,6 +44,12 @@ variable "cluster_security_group_id" {
   default     = null
 }
 
+variable "enable_cluster_security_group_ingress" {
+  description = "Whether to allow ingress from the EKS cluster security group."
+  type        = bool
+  default     = false
+}
+
 variable "apply_immediately" {
   description = "Whether modifications are applied immediately."
   type        = bool

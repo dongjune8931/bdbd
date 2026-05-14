@@ -29,7 +29,7 @@ resource "aws_vpc_security_group_ingress_rule" "cidr" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "eks_cluster" {
-  count = var.cluster_security_group_id == null ? 0 : 1
+  count = var.enable_cluster_security_group_ingress ? 1 : 0
 
   security_group_id            = aws_security_group.this.id
   referenced_security_group_id = var.cluster_security_group_id
