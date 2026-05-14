@@ -1,0 +1,68 @@
+replicaCount: 1
+
+image:
+  repository: 902371998304.dkr.ecr.ap-northeast-2.amazonaws.com/bodybuddy-dev-score-service
+  tag: 72d3705
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podAnnotations: {}
+
+podLabels: {}
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8081
+
+ingress:
+  enabled: false
+  className: alb
+  annotations: {}
+  hosts: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+config:
+  serviceName: score-service
+  logLevel: info
+  awsRegion: ap-northeast-2
+  dbHost: bodybuddy-dev-postgres.chqo0a0kqjjr.ap-northeast-2.rds.amazonaws.com
+  dbPort: 5432
+  dbName: bodybuddy
+  dbSslMode: require
+  redisAddr: master.bodybuddy-dev-redis.ebyc4l.apn2.cache.amazonaws.com:6379
+  analysisQueueUrl: https://sqs.ap-northeast-2.amazonaws.com/902371998304/bodybuddy-dev-analysis-queue
+  notificationQueueUrl: https://sqs.ap-northeast-2.amazonaws.com/902371998304/bodybuddy-dev-notification-queue
+  s3Bucket: bodybuddy-dev-inbody
+
+secrets:
+  dbUser: bodybuddy
+  dbPassword: "q1.niYNGm:Nc2Gc$Jd<tu8JncHgl"
+  redisPassword: ""
+  jwtSecret: "bodybuddy-dev-jwt-secret-2026-user-service"
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
