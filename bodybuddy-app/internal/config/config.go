@@ -18,6 +18,7 @@ type Common struct {
 	DBUser     string `envconfig:"DB_USER" required:"true"`
 	DBPassword string `envconfig:"DB_PASSWORD" required:"true"`
 	DBName     string `envconfig:"DB_NAME" required:"true"`
+	DBSSLMode  string `envconfig:"DB_SSL_MODE" default:"disable"`
 
 	RedisAddr     string `envconfig:"REDIS_ADDR" required:"true"`
 	RedisPassword string `envconfig:"REDIS_PASSWORD" default:""`
@@ -38,8 +39,8 @@ type Common struct {
 // DSN returns a PostgreSQL connection string.
 func (c *Common) DSN() string {
 	return fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		c.DBHost, c.DBPort, c.DBUser, c.DBPassword, c.DBName,
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		c.DBHost, c.DBPort, c.DBUser, c.DBPassword, c.DBName, c.DBSSLMode,
 	)
 }
 
