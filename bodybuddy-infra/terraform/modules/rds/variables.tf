@@ -69,6 +69,12 @@ variable "cluster_security_group_id" {
   default     = null
 }
 
+variable "enable_cluster_security_group_ingress" {
+  description = "Whether to allow ingress from the EKS cluster security group."
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Common tags applied to all resources."
   type        = map(string)

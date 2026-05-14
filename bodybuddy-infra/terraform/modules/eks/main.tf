@@ -32,24 +32,17 @@ module "eks" {
 
   eks_managed_node_groups = {
     bootstrap = {
-      name           = "bootstrap"
-      instance_types = var.bootstrap_instance_types
-      capacity_type  = "ON_DEMAND"
+      name                                  = "bootstrap"
+      ami_type                              = "AL2_x86_64"
+      instance_types                        = var.bootstrap_instance_types
+      capacity_type                         = "ON_DEMAND"
+      use_custom_launch_template            = false
+      attach_cluster_primary_security_group = true
+      disk_size                             = 20
 
       min_size     = var.bootstrap_min_size
       max_size     = var.bootstrap_max_size
       desired_size = var.bootstrap_desired_size
-
-      labels = {
-        "app.kubernetes.io/part-of" = "bodybuddy"
-        "bodybuddy.io/nodepool"     = "critical"
-        "karpenter.sh/discovery"    = var.cluster_name
-      }
-
-      tags = merge(var.tags, {
-        Name                     = "${var.cluster_name}-bootstrap"
-        "karpenter.sh/discovery" = var.cluster_name
-      })
     }
   }
 
