@@ -1,0 +1,38 @@
+{{- define "analysis-worker.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "analysis-worker.fullname" -}}
+{{- if .Values.fullnameOverride -}}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- include "analysis-worker.name" . -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "analysis-worker.chart" -}}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "analysis-worker.labels" -}}
+helm.sh/chart: {{ include "analysis-worker.chart" . }}
+app.kubernetes.io/name: {{ include "analysis-worker.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/part-of: bodybuddy
+app.kubernetes.io/component: worker
+{{- end -}}
+
+{{- define "analysis-worker.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "analysis-worker.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end -}}
+
+{{- define "analysis-worker.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create -}}
+{{- default (include "analysis-worker.fullname" .) .Values.serviceAccount.name -}}
+{{- else -}}
+{{- default "default" .Values.serviceAccount.name -}}
+{{- end -}}
+{{- end -}}

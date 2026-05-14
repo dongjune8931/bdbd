@@ -3,8 +3,9 @@ provider "aws" {
 }
 
 locals {
-  project     = "bodybuddy"
-  name_prefix = "${local.project}-${var.environment}"
+  project       = "bodybuddy"
+  name_prefix   = "${local.project}-${var.environment}"
+  app_namespace = "bodybuddy"
   common_tags = {
     Environment = var.environment
     Project     = local.project
@@ -122,4 +123,84 @@ module "elasticache" {
   automatic_failover_enabled            = false
   multi_az_enabled                      = false
   tags                                  = local.common_tags
+}
+
+data "aws_iam_policy_document" "analysis_worker_irsa" {
+  statement {
+    sid    = "AnalysisQueueAccess"
+    effect = "Allow"
+    actions = [
+      "sqs:ChangeMessageVisibility",
+      "sqs:DeleteMessage",
+      "sqs:GetQueueAttributes",
+      "sqs:GetQueueUrl",
+      "sqs:ReceiveMessage",
+    ]
+    resources = [module.sqs.analysis_queue_arn]
+  }
+
+  statement {
+    sid    = "InbodyBucketRead"
+    effect = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:HeadObject",
+      "s3:ListBucket",
+    ]
+    resources = [
+      module.s3.bucket_arn,
+      "${module.s3.bucket_arn}/*",
+    ]
+  }
+}
+
+data "aws_iam_policy_document" "notification_worker_irsa" {
+  statement {
+    sid    = "NotificationQueueAccess"
+    effect = "Allow"
+    actions = [
+      "sqs:ChangeMessageVisibility",
+      "sqs:DeleteMessage",
+      "sqs:GetQueueAttributes",
+      "sqs:GetQueueUrl",
+      "sqs:ReceiveMessage",
+    ]
+    resources = [module.sqs.notification_queue_arn]
+  }
+
+  statement {
+    sid    = "SendSesEmail"
+    effect = "Allow"
+    actions = [
+      "ses:SendEmail",
+      "ses:SendRawEmail",
+    ]
+    resources = ["*"]
+  }
+}
+
+module "analysis_worker_irsa" {
+  source = "../../modules/iam-irsa"
+
+  role_name            = "${local.name_prefix}-analysis-worker-irsa"
+  policy_name          = "${local.name_prefix}-analysis-worker-irsa"
+  policy_json          = data.aws_iam_policy_document.analysis_worker_irsa.json
+  oidc_provider        = module.eks.oidc_provider
+  oidc_provider_arn    = module.eks.oidc_provider_arn
+  namespace            = local.app_namespace
+  service_account_name = "analysis-worker"
+  tags                 = local.common_tags
+}
+
+module "notification_worker_irsa" {
+  source = "../../modules/iam-irsa"
+
+  role_name            = "${local.name_prefix}-notification-worker-irsa"
+  policy_name          = "${local.name_prefix}-notification-worker-irsa"
+  policy_json          = data.aws_iam_policy_document.notification_worker_irsa.json
+  oidc_provider        = module.eks.oidc_provider
+  oidc_provider_arn    = module.eks.oidc_provider_arn
+  namespace            = local.app_namespace
+  service_account_name = "notification-worker"
+  tags                 = local.common_tags
 }

@@ -1,0 +1,63 @@
+replicaCount: 1
+
+image:
+  repository: 902371998304.dkr.ecr.ap-northeast-2.amazonaws.com/bodybuddy-dev-analysis-worker
+  tag: 5f6282c
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::902371998304:role/bodybuddy-dev-analysis-worker-irsa
+
+podAnnotations: {}
+
+podLabels: {}
+
+service:
+  type: ClusterIP
+  port: 9090
+  targetPort: 9090
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+pdb:
+  enabled: true
+  maxUnavailable: 1
+
+config:
+  serviceName: analysis-worker
+  logLevel: info
+  awsRegion: ap-northeast-2
+  dbHost: bodybuddy-dev-postgres.chqo0a0kqjjr.ap-northeast-2.rds.amazonaws.com
+  dbPort: 5432
+  dbName: bodybuddy
+  dbSslMode: require
+  redisAddr: master.bodybuddy-dev-redis.ebyc4l.apn2.cache.amazonaws.com:6379
+  redisTlsEnabled: true
+  analysisQueueUrl: https://sqs.ap-northeast-2.amazonaws.com/902371998304/bodybuddy-dev-analysis-queue
+  notificationQueueUrl: https://sqs.ap-northeast-2.amazonaws.com/902371998304/bodybuddy-dev-notification-queue
+  s3Bucket: bodybuddy-dev-inbody
+  metricsPort: 9090
+  sqsVisibilityTimeout: 90
+  sqsMaxMessages: 10
+  sqsWaitTimeSeconds: 20
+  scoreServiceUrl: http://score-service.bodybuddy.svc.cluster.local
+
+secrets:
+  dbUser: bodybuddy
+  dbPassword: "q1.niYNGm:Nc2Gc$Jd<tu8JncHgl"
+  redisPassword: ""
+  jwtSecret: "bodybuddy-dev-jwt-secret-2026-user-service"
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
