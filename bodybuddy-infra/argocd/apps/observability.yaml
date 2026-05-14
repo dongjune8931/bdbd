@@ -30,6 +30,8 @@ spec:
             retention: 7d
         alertmanager:
           enabled: true
+        kubeStateMetrics:
+          enabled: false
         kubeEtcd:
           enabled: false
         kubeProxy:
