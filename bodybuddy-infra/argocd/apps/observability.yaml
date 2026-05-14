@@ -16,6 +16,9 @@ spec:
     targetRevision: 72.6.2
     helm:
       values: |
+        prometheusOperator:
+          admissionWebhooks:
+            enabled: false
         grafana:
           enabled: true
           adminPassword: bodybuddy-grafana-admin
