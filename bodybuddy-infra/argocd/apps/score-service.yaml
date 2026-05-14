@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: score-service
+  namespace: bodybuddy-system
+  labels:
+    app.kubernetes.io/part-of: bodybuddy
+    app.kubernetes.io/component: api
+spec:
+  project: bodybuddy
+  source:
+    repoURL: https://github.com/dongjune8931/bdbd.git
+    targetRevision: main
+    path: bodybuddy-app/deploy/helm/score-service
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bodybuddy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

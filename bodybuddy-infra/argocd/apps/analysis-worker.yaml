@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: analysis-worker
+  namespace: bodybuddy-system
+  labels:
+    app.kubernetes.io/part-of: bodybuddy
+    app.kubernetes.io/component: worker
+spec:
+  project: bodybuddy
+  source:
+    repoURL: https://github.com/dongjune8931/bdbd.git
+    targetRevision: main
+    path: bodybuddy-app/deploy/helm/analysis-worker
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bodybuddy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
