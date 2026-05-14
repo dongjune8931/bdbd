@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: 902371998304.dkr.ecr.ap-northeast-2.amazonaws.com/bodybuddy-dev-score-service
-  tag: 72d3705
+  tag: 5f6282c
   pullPolicy: IfNotPresent
 
 serviceAccount:
