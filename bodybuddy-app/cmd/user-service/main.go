@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/bodybuddy/app/internal/auth"
 	"github.com/bodybuddy/app/internal/cache"
@@ -121,7 +123,11 @@ func registerHandler(cfg *config.UserService, pool *db.Pool) gin.HandlerFunc {
 		user, err := domain.CreateUser(c.Request.Context(), pool.Pool, req.Email, req.Password)
 		if err != nil {
 			slog.Error("failed to create user", "error", err)
-			c.JSON(http.StatusConflict, gin.H{"error": "email already registered"})
+			if isUniqueViolation(err) {
+				c.JSON(http.StatusConflict, gin.H{"error": "email already registered"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 			return
 		}
 
@@ -138,6 +144,11 @@ func registerHandler(cfg *config.UserService, pool *db.Pool) gin.HandlerFunc {
 			"token":   token,
 		})
 	}
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 type loginRequest struct {
