@@ -44,7 +44,7 @@ func main() {
 	}
 	defer dbPool.Close()
 
-	redisClient := cache.New(cfg.RedisAddr, cfg.RedisPassword)
+	redisClient := cache.New(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisTLSEnabled)
 	defer redisClient.Close()
 
 	sqsClient, err := queue.New(context.Background(), cfg.AWSRegion, cfg.SQSEndpoint)

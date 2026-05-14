@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 
 	"github.com/redis/go-redis/v9"
@@ -13,12 +14,19 @@ type Client struct {
 }
 
 // New creates a new Redis client.
-func New(addr, password string) *Client {
-	rdb := redis.NewClient(&redis.Options{
+func New(addr, password string, tlsEnabled bool) *Client {
+	opts := &redis.Options{
 		Addr:     addr,
 		Password: password,
 		DB:       0,
-	})
+	}
+	if tlsEnabled {
+		opts.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		}
+	}
+
+	rdb := redis.NewClient(opts)
 	return &Client{rdb}
 }
 

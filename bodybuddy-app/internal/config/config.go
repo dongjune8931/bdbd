@@ -22,6 +22,7 @@ type Common struct {
 
 	RedisAddr     string `envconfig:"REDIS_ADDR" required:"true"`
 	RedisPassword string `envconfig:"REDIS_PASSWORD" default:""`
+	RedisTLSEnabled bool `envconfig:"REDIS_TLS_ENABLED" default:"false"`
 
 	// SQSEndpoint is used to override the SQS endpoint for localstack.
 	SQSEndpoint          string `envconfig:"SQS_ENDPOINT" default:""`

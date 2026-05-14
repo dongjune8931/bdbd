@@ -48,6 +48,8 @@ spec:
               value: {{ .Values.config.dbSslMode | quote }}
             - name: REDIS_ADDR
               value: {{ .Values.config.redisAddr | quote }}
+            - name: REDIS_TLS_ENABLED
+              value: {{ .Values.config.redisTlsEnabled | quote }}
             - name: AWS_REGION
               value: {{ .Values.config.awsRegion | quote }}
             - name: ANALYSIS_QUEUE_URL

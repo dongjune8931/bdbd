@@ -47,7 +47,7 @@ func main() {
 	defer dbPool.Close()
 
 	// --- Cache ---
-	redisClient := cache.New(cfg.RedisAddr, cfg.RedisPassword)
+	redisClient := cache.New(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisTLSEnabled)
 	defer redisClient.Close()
 
 	// --- SQS ---
