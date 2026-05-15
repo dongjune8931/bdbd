@@ -35,6 +35,10 @@ type Common struct {
 	S3Bucket   string `envconfig:"S3_BUCKET" required:"true"`
 
 	JWTSecret string `envconfig:"JWT_SECRET" required:"true"`
+
+	// OTelEndpoint is the OpenTelemetry Collector gRPC endpoint.
+	// Leave empty to disable tracing (e.g. local dev without collector).
+	OTelEndpoint string `envconfig:"OTEL_EXPORTER_OTLP_ENDPOINT" default:""`
 }
 
 // DSN returns a PostgreSQL connection string.

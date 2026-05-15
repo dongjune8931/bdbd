@@ -14,6 +14,11 @@ import (
 	"syscall"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"github.com/bodybuddy/app/internal/cache"
 	"github.com/bodybuddy/app/internal/config"
 	"github.com/bodybuddy/app/internal/db"
@@ -33,6 +38,16 @@ func main() {
 
 	// --- Config ---
 	cfg := config.MustLoadAnalysisWorker()
+
+	// --- Tracer ---
+	if cfg.OTelEndpoint != "" {
+		shutdown, err := observability.InitTracer(context.Background(), cfg.ServiceName, cfg.OTelEndpoint)
+		if err != nil {
+			slog.Warn("failed to init tracer, continuing without tracing", "error", err)
+		} else {
+			defer shutdown(context.Background()) //nolint:errcheck
+		}
+	}
 
 	// --- Observability ---
 	reg := observability.NewRegistry()
@@ -154,6 +169,10 @@ func runPollingLoop(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *
 //
 //	{ "user_id": "...", "upload_id": "...", "s3_key": "..." }
 func processMessage(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *queue.Client, msg queue.Message, metrics *observability.Metrics) {
+	tracer := otel.Tracer("analysis-worker")
+	ctx, span := tracer.Start(ctx, "analysis-worker.processMessage")
+	defer span.End()
+
 	start := time.Now()
 
 	var payload struct {
@@ -163,9 +182,16 @@ func processMessage(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *
 	}
 	if err := json.Unmarshal([]byte(msg.Body), &payload); err != nil {
 		slog.Error("failed to parse message body", "message_id", msg.MessageID, "error", err)
+		span.SetStatus(codes.Error, "failed to parse message body")
 		// Do not delete — let DLQ handle malformed messages after maxReceiveCount.
 		return
 	}
+
+	span.SetAttributes(
+		attribute.String("messaging.message_id", msg.MessageID),
+		attribute.String("user.id", payload.UserID),
+		attribute.String("upload.id", payload.UploadID),
+	)
 
 	slog.Info("processing analysis message",
 		"message_id", msg.MessageID,
@@ -201,6 +227,7 @@ func processMessage(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *
 			"message_id", msg.MessageID,
 			"error", err,
 		)
+		span.SetStatus(codes.Error, err.Error())
 		// Do not delete — let SQS retry (up to maxReceiveCount=3) before DLQ.
 		return
 	}
@@ -243,7 +270,10 @@ func postScore(ctx context.Context, baseURL, userID, uploadID string, breakdown 
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{
+		Timeout:   10 * time.Second,
+		Transport: otelhttp.NewTransport(http.DefaultTransport),
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("calling score-service: %w", err)
