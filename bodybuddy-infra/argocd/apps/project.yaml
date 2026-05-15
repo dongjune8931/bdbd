@@ -8,10 +8,13 @@ spec:
   sourceRepos:
     - https://github.com/dongjune8931/bdbd.git
     - https://prometheus-community.github.io/helm-charts
+    - https://kubecost.github.io/cost-analyzer/
   destinations:
     - namespace: bodybuddy
       server: https://kubernetes.default.svc
     - namespace: bodybuddy-system
+      server: https://kubernetes.default.svc
+    - namespace: kubecost
       server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     - group: "*"
