@@ -63,7 +63,7 @@ config:
 
 secrets:
   dbUser: bodybuddy
-  dbPassword: "q1.niYNGm:Nc2Gc$Jd<tu8JncHgl"
+  dbPassword: "lPzknz95vkd<#l8.ycy$BNW|zZ#i"
   redisPassword: ""
   jwtSecret: "bodybuddy-dev-jwt-secret-2026-user-service"
 
