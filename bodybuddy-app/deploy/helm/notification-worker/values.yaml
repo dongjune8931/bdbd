@@ -60,7 +60,8 @@ secrets:
   redisPassword: ""
   jwtSecret: "bodybuddy-dev-jwt-secret-2026-user-service"
 
-nodeSelector: {}
+nodeSelector:
+  workload-type: batch
 
 tolerations: []
 
