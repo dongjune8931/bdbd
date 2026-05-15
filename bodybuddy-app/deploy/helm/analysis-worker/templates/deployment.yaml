@@ -86,6 +86,10 @@ spec:
                 secretKeyRef:
                   name: {{ include "analysis-worker.fullname" . }}
                   key: JWT_SECRET
+            {{- if .Values.config.otelEndpoint }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.config.otelEndpoint | quote }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /readyz
