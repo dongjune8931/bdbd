@@ -8,7 +8,8 @@ image:
 serviceAccount:
   create: true
   name: ""
-  annotations: {}
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::902371998304:role/bodybuddy-dev-user-service-irsa"
 
 podAnnotations: {}
 
