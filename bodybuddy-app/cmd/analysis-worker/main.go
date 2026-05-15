@@ -169,6 +169,9 @@ func runPollingLoop(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *
 //
 //	{ "user_id": "...", "upload_id": "...", "s3_key": "..." }
 func processMessage(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *queue.Client, msg queue.Message, metrics *observability.Metrics) {
+	// Extract trace context propagated via SQS message attributes.
+	ctx = otel.GetTextMapPropagator().Extract(ctx, queue.NewSQSReadCarrier(msg.Attributes))
+
 	tracer := otel.Tracer("analysis-worker")
 	ctx, span := tracer.Start(ctx, "analysis-worker.processMessage")
 	defer span.End()

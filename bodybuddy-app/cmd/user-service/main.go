@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/bodybuddy/app/internal/auth"
 	"github.com/bodybuddy/app/internal/cache"
 	"github.com/bodybuddy/app/internal/config"
@@ -24,6 +25,7 @@ import (
 	"github.com/bodybuddy/app/internal/observability"
 	"github.com/bodybuddy/app/internal/queue"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.opentelemetry.io/otel"
 )
 
 func main() {
@@ -247,7 +249,10 @@ func createUploadHandler(cfg *config.UserService, pool *db.Pool, sqsClient *queu
 			`{"user_id":%q,"upload_id":%q,"s3_key":%q}`,
 			claims.UserID, uploadID, s3Key,
 		)
-		msgID, err := sqsClient.SendMessage(c.Request.Context(), cfg.AnalysisQueueURL, msgBody, nil)
+		// Inject trace context into SQS message attributes for distributed tracing.
+		sqsAttrs := make(map[string]types.MessageAttributeValue)
+		otel.GetTextMapPropagator().Inject(c.Request.Context(), queue.NewSQSCarrier(sqsAttrs))
+		msgID, err := sqsClient.SendMessage(c.Request.Context(), cfg.AnalysisQueueURL, msgBody, sqsAttrs)
 		if err != nil {
 			slog.Error("failed to publish to analysis queue", "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue analysis"})

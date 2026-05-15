@@ -10,6 +10,49 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
 
+// SQSCarrier implements propagation.TextMapCarrier for injecting trace context
+// into SQS message attributes (write path).
+type SQSCarrier struct {
+	attrs map[string]types.MessageAttributeValue
+}
+
+func NewSQSCarrier(attrs map[string]types.MessageAttributeValue) *SQSCarrier {
+	return &SQSCarrier{attrs: attrs}
+}
+
+func (c *SQSCarrier) Get(_ string) string { return "" }
+
+func (c *SQSCarrier) Set(key, value string) {
+	c.attrs[key] = types.MessageAttributeValue{
+		DataType:    aws.String("String"),
+		StringValue: aws.String(value),
+	}
+}
+
+func (c *SQSCarrier) Keys() []string { return nil }
+
+// SQSReadCarrier implements propagation.TextMapCarrier for extracting trace context
+// from a received SQS message (read path).
+type SQSReadCarrier struct {
+	attrs map[string]string
+}
+
+func NewSQSReadCarrier(attrs map[string]string) *SQSReadCarrier {
+	return &SQSReadCarrier{attrs: attrs}
+}
+
+func (c *SQSReadCarrier) Get(key string) string { return c.attrs[key] }
+
+func (c *SQSReadCarrier) Set(key, value string) { c.attrs[key] = value }
+
+func (c *SQSReadCarrier) Keys() []string {
+	keys := make([]string, 0, len(c.attrs))
+	for k := range c.attrs {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
 // Message is a simplified SQS message.
 type Message struct {
 	MessageID     string
@@ -62,10 +105,17 @@ func (c *Client) ReceiveMessages(ctx context.Context, queueURL string, maxMessag
 
 	msgs := make([]Message, 0, len(out.Messages))
 	for _, m := range out.Messages {
+		attrs := make(map[string]string, len(m.MessageAttributes))
+		for k, v := range m.MessageAttributes {
+			if v.StringValue != nil {
+				attrs[k] = *v.StringValue
+			}
+		}
 		msg := Message{
 			MessageID:     aws.ToString(m.MessageId),
 			ReceiptHandle: aws.ToString(m.ReceiptHandle),
 			Body:          aws.ToString(m.Body),
+			Attributes:    attrs,
 		}
 		msgs = append(msgs, msg)
 	}
