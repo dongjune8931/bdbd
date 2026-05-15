@@ -49,7 +49,7 @@ config:
   analysisQueueUrl: https://sqs.ap-northeast-2.amazonaws.com/902371998304/bodybuddy-dev-analysis-queue
   notificationQueueUrl: https://sqs.ap-northeast-2.amazonaws.com/902371998304/bodybuddy-dev-notification-queue
   s3Bucket: bodybuddy-dev-inbody
-  otelEndpoint: "opentelemetry-collector.bodybuddy-system:4317"
+  otelEndpoint: "otel-collector-opentelemetry-collector.bodybuddy-system:4317"
   metricsPort: 9090
   sqsVisibilityTimeout: 90
   sqsMaxMessages: 10
