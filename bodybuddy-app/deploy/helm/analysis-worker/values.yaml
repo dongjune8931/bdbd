@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: 902371998304.dkr.ecr.ap-northeast-2.amazonaws.com/bodybuddy-dev-analysis-worker
-  tag: 3a929c1
+  tag: a427512
   pullPolicy: IfNotPresent
 
 serviceAccount:
