@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: karpenter-capacity
+  namespace: bodybuddy-system
+  labels:
+    app.kubernetes.io/part-of: bodybuddy
+    app.kubernetes.io/component: infrastructure
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: bodybuddy
+  source:
+    repoURL: https://github.com/dongjune8931/bdbd.git
+    targetRevision: main
+    path: bodybuddy-infra/argocd/karpenter
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bodybuddy-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
