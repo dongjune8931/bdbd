@@ -4,10 +4,12 @@ metadata:
   name: default
 spec:
   amiFamily: AL2
+  amiSelectorTerms:
+    - alias: al2@latest
   role: bodybuddy-dev-eks-karpenter-node
   subnetSelectorTerms:
-    - id: subnet-0820e007032de500f
-    - id: subnet-04c238849d3f74d0c
+    - id: subnet-09336f111c4e59ac7
+    - id: subnet-0804981ab77907b7b
   securityGroupSelectorTerms:
     - tags:
         karpenter.sh/discovery: bodybuddy-dev-eks
