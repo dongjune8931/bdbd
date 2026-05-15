@@ -1,11 +1,20 @@
 package observability
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Metrics holds common Prometheus metrics for all services.
@@ -78,6 +87,42 @@ func NewMetrics(serviceName string, reg *prometheus.Registry) *Metrics {
 // NewRegistry creates a new Prometheus registry and registers standard metrics.
 func NewRegistry() *prometheus.Registry {
 	return prometheus.NewRegistry()
+}
+
+// InitTracer sets up the global OpenTelemetry tracer with an OTLP gRPC exporter.
+// endpoint should be the OTel Collector address, e.g. "opentelemetry-collector.bodybuddy-system:4317".
+// Returns a shutdown function that must be called on service exit.
+func InitTracer(ctx context.Context, serviceName, endpoint string) (func(context.Context) error, error) {
+	conn, err := grpc.NewClient(endpoint,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	exporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn))
+	if err != nil {
+		return nil, err
+	}
+
+	res := resource.NewWithAttributes(
+		semconv.SchemaURL,
+		semconv.ServiceNameKey.String(serviceName),
+	)
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(res),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+	)
+
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	))
+
+	return tp.Shutdown, nil
 }
 
 // Handler returns the HTTP handler for /metrics.

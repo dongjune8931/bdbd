@@ -23,6 +23,7 @@ import (
 	bbhttp "github.com/bodybuddy/app/internal/http"
 	"github.com/bodybuddy/app/internal/observability"
 	"github.com/bodybuddy/app/internal/queue"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 func main() {
@@ -32,6 +33,16 @@ func main() {
 	slog.SetDefault(logger.With("service", "user-service"))
 
 	cfg := config.MustLoadUserService()
+
+	// Init tracer — non-fatal if OTel Collector is unreachable
+	if cfg.OTelEndpoint != "" {
+		shutdown, err := observability.InitTracer(context.Background(), cfg.ServiceName, cfg.OTelEndpoint)
+		if err != nil {
+			slog.Warn("failed to init tracer, continuing without tracing", "error", err)
+		} else {
+			defer shutdown(context.Background()) //nolint:errcheck
+		}
+	}
 
 	reg := observability.NewRegistry()
 	metrics := observability.NewMetrics(cfg.ServiceName, reg)
@@ -57,6 +68,7 @@ func main() {
 	r := gin.New()
 	r.Use(bbhttp.Recovery(slog.Default()))
 	r.Use(bbhttp.RequestID())
+	r.Use(otelgin.Middleware(cfg.ServiceName))
 	r.Use(bbhttp.Logger(slog.Default()))
 
 	health := bbhttp.NewHealthHandlers(dbPool, redisClient)
