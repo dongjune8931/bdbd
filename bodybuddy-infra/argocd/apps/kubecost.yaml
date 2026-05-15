@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubecost
+  namespace: bodybuddy-system
+  labels:
+    app.kubernetes.io/part-of: bodybuddy
+    app.kubernetes.io/component: observability
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://kubecost.github.io/cost-analyzer/
+    chart: cost-analyzer
+    targetRevision: 2.6.5
+    helm:
+      values: |
+        global:
+          prometheus:
+            # Use existing kube-prometheus-stack Prometheus
+            enabled: false
+            fqdn: http://observability-kube-prometh-prometheus.bodybuddy-system:9090
+          grafana:
+            # Use existing Grafana
+            enabled: false
+            proxy: false
+            fqdn: http://observability-grafana.bodybuddy-system
+        kubecostProductConfigs:
+          clusterName: bodybuddy-dev-eks
+          currencyCode: USD
+        kubecostFrontend:
+          enabled: true
+        grafana:
+          enabled: false
+        prometheus:
+          enabled: false
+        # Reduce resource usage for dev
+        kubecostModel:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+        grafanaNetworkMonitoring: false
+        serviceMonitor:
+          enabled: false
+        persistentVolume:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kubecost
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
