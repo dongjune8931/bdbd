@@ -33,6 +33,7 @@ data "aws_iam_policy_document" "controller" {
     actions = [
       "ec2:DescribeAvailabilityZones",
       "ec2:DescribeImages",
+      "ec2:DescribeInstances",
       "ec2:DescribeInstanceTypeOfferings",
       "ec2:DescribeInstanceTypes",
       "ec2:DescribeLaunchTemplates",
@@ -66,6 +67,19 @@ data "aws_iam_policy_document" "controller" {
       "iam:PassRole",
     ]
     resources = [aws_iam_role.node.arn]
+  }
+
+  statement {
+    sid = "AllowInstanceProfileLifecycle"
+    actions = [
+      "iam:AddRoleToInstanceProfile",
+      "iam:CreateInstanceProfile",
+      "iam:DeleteInstanceProfile",
+      "iam:GetInstanceProfile",
+      "iam:RemoveRoleFromInstanceProfile",
+      "iam:TagInstanceProfile",
+    ]
+    resources = ["*"]
   }
 
   statement {
