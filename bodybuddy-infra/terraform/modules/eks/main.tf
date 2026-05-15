@@ -18,6 +18,14 @@ module "eks" {
 
   cluster_enabled_log_types = var.cluster_enabled_log_types
 
+  cluster_security_group_tags = merge(var.tags, {
+    "karpenter.sh/discovery" = var.cluster_name
+  })
+
+  node_security_group_tags = merge(var.tags, {
+    "karpenter.sh/discovery" = var.cluster_name
+  })
+
   cluster_addons = {
     coredns = {
       most_recent = true

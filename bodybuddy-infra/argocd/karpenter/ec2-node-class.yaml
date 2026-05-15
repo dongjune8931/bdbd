@@ -1,0 +1,18 @@
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: default
+spec:
+  amiFamily: AL2
+  role: bodybuddy-dev-eks-karpenter-node
+  subnetSelectorTerms:
+    - id: subnet-0820e007032de500f
+    - id: subnet-04c238849d3f74d0c
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: bodybuddy-dev-eks
+  tags:
+    Project: bodybuddy
+    Environment: dev
+    ManagedBy: argocd
+    karpenter.sh/discovery: bodybuddy-dev-eks
