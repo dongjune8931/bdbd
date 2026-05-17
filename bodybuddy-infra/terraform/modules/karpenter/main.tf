@@ -34,6 +34,7 @@ data "aws_iam_policy_document" "controller" {
       "ec2:DescribeAvailabilityZones",
       "ec2:DescribeImages",
       "ec2:DescribeInstances",
+      "ec2:DescribeInstanceStatus",
       "ec2:DescribeInstanceTypeOfferings",
       "ec2:DescribeInstanceTypes",
       "ec2:DescribeLaunchTemplates",
@@ -42,6 +43,7 @@ data "aws_iam_policy_document" "controller" {
       "ec2:DescribeSubnets",
       "ec2:DescribeVolumes",
       "ec2:DescribeVpcs",
+      "eks:DescribeCluster",
       "pricing:GetProducts",
       "ssm:GetParameter",
     ]
@@ -76,6 +78,7 @@ data "aws_iam_policy_document" "controller" {
       "iam:CreateInstanceProfile",
       "iam:DeleteInstanceProfile",
       "iam:GetInstanceProfile",
+      "iam:ListInstanceProfiles",
       "iam:RemoveRoleFromInstanceProfile",
       "iam:TagInstanceProfile",
     ]
