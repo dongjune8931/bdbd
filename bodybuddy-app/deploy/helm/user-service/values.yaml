@@ -32,6 +32,7 @@ ingress:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/security-groups: bodybuddy-dev-user-service-alb
   hosts:
     - host: ""
       paths:

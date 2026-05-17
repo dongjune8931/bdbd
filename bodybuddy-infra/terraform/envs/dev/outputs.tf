@@ -48,6 +48,11 @@ output "eks_oidc_provider_arn" {
   value       = module.eks.oidc_provider_arn
 }
 
+output "user_service_alb_security_group_id" {
+  description = "Stable security group ID used by the user-service ALB."
+  value       = aws_security_group.user_service_alb.id
+}
+
 output "karpenter_controller_iam_role_arn" {
   description = "IAM role ARN for the Karpenter controller."
   value       = module.karpenter.controller_iam_role_arn

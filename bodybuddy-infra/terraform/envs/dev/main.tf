@@ -76,6 +76,42 @@ module "eks" {
   tags = local.common_tags
 }
 
+resource "aws_security_group" "user_service_alb" {
+  name                   = "${local.name_prefix}-user-service-alb"
+  description            = "Security group for the user-service ALB."
+  vpc_id                 = module.vpc.vpc_id
+  revoke_rules_on_delete = true
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-user-service-alb"
+  })
+}
+
+resource "aws_vpc_security_group_ingress_rule" "user_service_alb_http" {
+  security_group_id = aws_security_group.user_service_alb.id
+  description       = "HTTP from the internet to user-service ALB"
+  ip_protocol       = "tcp"
+  from_port         = 80
+  to_port           = 80
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_egress_rule" "user_service_alb_all" {
+  security_group_id = aws_security_group.user_service_alb.id
+  description       = "All outbound traffic from user-service ALB"
+  ip_protocol       = "-1"
+  cidr_ipv4         = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "user_service_alb_to_nodes_http" {
+  security_group_id            = module.eks.node_security_group_id
+  description                  = "user-service ALB to Karpenter and bootstrap nodes"
+  referenced_security_group_id = aws_security_group.user_service_alb.id
+  ip_protocol                  = "tcp"
+  from_port                    = 8080
+  to_port                      = 8080
+}
+
 module "karpenter" {
   source = "../../modules/karpenter"
 
