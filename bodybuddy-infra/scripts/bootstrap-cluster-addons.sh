@@ -9,8 +9,6 @@ AWS_REGION="${AWS_REGION:-ap-northeast-2}"
 ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-bodybuddy-system}"
 KARPENTER_NAMESPACE="${KARPENTER_NAMESPACE:-karpenter}"
 KARPENTER_VERSION="${KARPENTER_VERSION:-1.12.1}"
-ALB_CONTROLLER_ROLE_NAME="${ALB_CONTROLLER_ROLE_NAME:-AmazonEKSLoadBalancerControllerRole}"
-ALB_CONTROLLER_ROLE_ARN="${ALB_CONTROLLER_ROLE_ARN:-arn:aws:iam::902371998304:role/${ALB_CONTROLLER_ROLE_NAME}}"
 
 echo "Reading Terraform outputs from $TF_DIR"
 tf_outputs="$(AWS_PROFILE="$AWS_PROFILE" terraform -chdir="$TF_DIR" output -json)"
@@ -22,7 +20,7 @@ vpc_id="$(jq -r '.vpc_id.value' <<<"$tf_outputs")"
 karpenter_controller_role_arn="$(jq -r '.karpenter_controller_iam_role_arn.value' <<<"$tf_outputs")"
 karpenter_queue_url="$(jq -r '.karpenter_interruption_queue_url.value' <<<"$tf_outputs")"
 karpenter_queue_name="${karpenter_queue_url##*/}"
-oidc_provider="${oidc_provider_arn#*oidc-provider/}"
+alb_controller_role_arn="$(jq -r '.aws_load_balancer_controller_irsa_role_arn.value' <<<"$tf_outputs")"
 
 echo "Updating kubeconfig for $cluster_name"
 aws eks update-kubeconfig \
@@ -60,36 +58,6 @@ helm upgrade --install karpenter oci://public.ecr.aws/karpenter/karpenter \
   --wait \
   --timeout 10m
 
-echo "Refreshing AWS Load Balancer Controller IRSA trust policy"
-trust_policy="$(mktemp)"
-cat >"$trust_policy" <<JSON
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Federated": "$oidc_provider_arn"
-      },
-      "Action": "sts:AssumeRoleWithWebIdentity",
-      "Condition": {
-        "StringEquals": {
-          "$oidc_provider:aud": "sts.amazonaws.com",
-          "$oidc_provider:sub": "system:serviceaccount:kube-system:aws-load-balancer-controller"
-        }
-      }
-    }
-  ]
-}
-JSON
-
-aws iam update-assume-role-policy \
-  --role-name "$ALB_CONTROLLER_ROLE_NAME" \
-  --policy-document "file://$trust_policy" \
-  --profile "$AWS_PROFILE"
-
-rm -f "$trust_policy"
-
 echo "Installing AWS Load Balancer Controller"
 helm repo add eks https://aws.github.io/eks-charts >/dev/null 2>&1 || true
 helm repo update eks >/dev/null
@@ -100,7 +68,7 @@ helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-contro
   --set "vpcId=$vpc_id" \
   --set serviceAccount.create=true \
   --set serviceAccount.name=aws-load-balancer-controller \
-  --set "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn=$ALB_CONTROLLER_ROLE_ARN" \
+  --set "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn=$alb_controller_role_arn" \
   --wait \
   --timeout 10m
 

@@ -68,6 +68,11 @@ output "karpenter_interruption_queue_url" {
   value       = module.karpenter.interruption_queue_url
 }
 
+output "aws_load_balancer_controller_irsa_role_arn" {
+  description = "IAM role ARN for the AWS Load Balancer Controller service account."
+  value       = module.aws_load_balancer_controller_irsa.role_arn
+}
+
 output "analysis_worker_irsa_role_arn" {
   description = "IAM role ARN for the analysis-worker service account."
   value       = module.analysis_worker_irsa.role_arn

@@ -8,7 +8,7 @@
 
 ## 1. 왜 이 문서가 필요한가
 
-이 프로젝트는 아직 다음 항목들이 완전히 코드화되어 있지 않다.
+이 프로젝트는 destroy/reapply 이후에도 일부 값이 새로 생성되므로, 아래 항목을 순서대로 재동기화해야 한다.
 
 1. **앱 Helm values에 인프라 값이 하드코딩**되어 있다.
    - RDS endpoint
@@ -17,11 +17,9 @@
    - S3 bucket 이름
    - DB 비밀번호
 
-2. **Terraform이 직접 관리하지 않는 Kubernetes/AWS 수동 리소스**가 있다.
+2. **Terraform이 직접 설치하지 않는 Kubernetes 애드온**이 있다.
    - ArgoCD 설치 자체
    - AWS Load Balancer Controller 설치
-   - ALB Controller role trust policy 재연결
-   - `aws eks create-access-entry`로 만든 Karpenter node role access entry
    - `observability-kube-prometh-admission` secret
 
 3. **재생성 시 바뀌는 값**이 있다.
@@ -102,11 +100,16 @@ destroy/reapply 후 바뀌는 값:
 - OIDC issuer
 - OIDC provider ARN
 
-특히 ALB Controller처럼 **기존 IAM role을 재사용하는 경우**, trust policy가 이전 OIDC를 가리키고 있으면 WebIdentity 인증이 깨진다.
+ALB Controller IRSA role/policy는 이제 Terraform으로 관리한다.
 
-대표 사례:
+관련 Terraform 리소스:
 
-- `AmazonEKSLoadBalancerControllerRole`
+- `module.aws_load_balancer_controller_irsa.aws_iam_role.this`
+- `module.aws_load_balancer_controller_irsa.aws_iam_policy.this`
+- `module.aws_load_balancer_controller_irsa.aws_iam_role_policy_attachment.this`
+
+즉 destroy/reapply 후 별도 `aws iam update-assume-role-policy`를 직접 실행하지 않는다.  
+`bodybuddy-infra/scripts/bootstrap-cluster-addons.sh`가 Terraform output의 `aws_load_balancer_controller_irsa_role_arn`을 읽어 Helm service account annotation에 넣는다.
 
 ### 2.4 RDS managed master password
 
@@ -165,18 +168,25 @@ AWS_PROFILE=terraform-bodybuddy terraform -chdir=bodybuddy-infra/terraform/envs/
 AWS_PROFILE=terraform-bodybuddy terraform -chdir=bodybuddy-infra/terraform/envs/dev apply
 ```
 
-### 4.2 kubeconfig 갱신
+### 4.2 클러스터 애드온 재부트스트랩
 
 ```bash
-aws eks update-kubeconfig \
-  --name bodybuddy-dev-eks \
-  --region ap-northeast-2 \
-  --profile terraform-bodybuddy
+AWS_PROFILE=terraform-bodybuddy \
+  /Users/idongjun/Desktop/Project/bdbd_prog/bodybuddy-infra/scripts/bootstrap-cluster-addons.sh
 ```
+
+이 스크립트는 다음을 idempotent하게 수행한다.
+
+- kubeconfig 갱신
+- `bodybuddy-system`, `karpenter` namespace 생성
+- ArgoCD Helm 설치
+- Karpenter CRD/controller 설치
+- AWS Load Balancer Controller Helm 설치
+- ArgoCD project/app-of-apps 적용
 
 주의:
 - 이 세션에서 EKS endpoint DNS가 자주 흔들렸다.
-- `kubectl`이 갑자기 `no such host`를 내면 제일 먼저 이 명령부터 다시 친다.
+- `kubectl`이 갑자기 `no such host`를 내면 이 스크립트 또는 `aws eks update-kubeconfig`부터 다시 실행한다.
 
 ### 4.3 Terraform output으로 재생성 값 확인
 
@@ -241,26 +251,10 @@ subnetSelectorTerms:
   - id: <private_subnet_2>
 ```
 
-### 4.6 ArgoCD 재설치
+### 4.6 ArgoCD 수동 재설치 fallback
 
-반복 설치를 줄이기 위해 아래 스크립트를 우선 사용한다.
-
-```bash
-AWS_PROFILE=terraform-bodybuddy \
-  /Users/idongjun/Desktop/Project/bdbd_prog/bodybuddy-infra/scripts/bootstrap-cluster-addons.sh
-```
-
-이 스크립트는 다음을 idempotent하게 수행한다.
-
-- kubeconfig 갱신
-- `bodybuddy-system`, `karpenter` namespace 생성
-- ArgoCD Helm 설치
-- Karpenter CRD/controller 설치
-- AWS Load Balancer Controller OIDC trust 갱신
-- AWS Load Balancer Controller Helm 설치
-- ArgoCD project/app-of-apps 적용
-
-destroy 후에는 ArgoCD CRD 자체가 사라지므로 다시 설치해야 한다.
+보통은 `bootstrap-cluster-addons.sh`만 쓰면 된다.  
+스크립트가 실패했을 때만 아래를 fallback으로 사용한다.
 
 ```bash
 kubectl create namespace bodybuddy-system
@@ -281,7 +275,7 @@ kubectl apply -f /Users/idongjun/Desktop/Project/bdbd_prog/bodybuddy-infra/argoc
 이번 세션에서 확인된 사실:
 
 - 구버전 Karpenter 차트는 `Provisioner` / `AWSNodeTemplate` CRD를 깔아서 현재 repo의 `NodePool` / `EC2NodeClass`와 API가 맞지 않았다.
-- Karpenter는 **v1.3.3 + 새 CRD** 조합으로 다시 올려야 정상 동작했다.
+- 현재 기준은 `bootstrap-cluster-addons.sh`의 `KARPENTER_VERSION=1.12.1`이다.
 
 확인할 것:
 
@@ -293,23 +287,25 @@ kubectl get ec2nodeclass
 
 ### 4.8 Karpenter node access entry 확인
 
-destroy/reapply 후 새 Karpenter node는 EC2가 떠도 EKS에 join 못 할 수 있다.  
-이번 세션에서는 아래 명령으로 해결했다.
+Karpenter node role access entry는 이제 Terraform으로 관리한다.
+
+관련 리소스:
+
+- `aws_eks_access_entry.karpenter_node`
+
+따라서 새 Karpenter node가 EC2로는 떠도 EKS에 join 못 하면, 먼저 Terraform state/plan에서 이 리소스를 확인한다.
 
 ```bash
-aws eks create-access-entry \
-  --cluster-name bodybuddy-dev-eks \
-  --principal-arn arn:aws:iam::902371998304:role/bodybuddy-dev-eks-karpenter-node \
-  --type EC2_LINUX \
-  --region ap-northeast-2 \
-  --profile terraform-bodybuddy
+AWS_PROFILE=terraform-bodybuddy terraform -chdir=bodybuddy-infra/terraform/envs/dev state show aws_eks_access_entry.karpenter_node
+AWS_PROFILE=terraform-bodybuddy terraform -chdir=bodybuddy-infra/terraform/envs/dev plan
 ```
 
-이게 코드화돼 있지 않기 때문에, **새 spot/on-demand 노드가 `Ready`가 안 되면 가장 먼저 의심할 포인트**다.
+정상이라면 수동 `aws eks create-access-entry`를 다시 치지 않는다.
 
 ### 4.9 AWS Load Balancer Controller 재설치
 
-destroy 후에는 ALB Controller가 사라지므로 `user-service` ingress는 `ADDRESS`가 빈 채로 남는다.
+destroy 후에는 ALB Controller pod가 사라지므로, `bootstrap-cluster-addons.sh`로 다시 설치해야 한다.  
+IAM role/policy/trust는 Terraform이 관리하고, Helm 설치는 bootstrap 스크립트가 담당한다.
 
 확인:
 
@@ -321,7 +317,7 @@ kubectl get pods -n kube-system | grep -i load-balancer
 주의 포인트:
 
 1. controller Helm install 자체
-2. `AmazonEKSLoadBalancerControllerRole` trust policy가 **새 OIDC**를 가리키는지
+2. Terraform output `aws_load_balancer_controller_irsa_role_arn`가 정상인지
 3. service account annotation이 올바른지
 
 증상:
@@ -372,13 +368,13 @@ kubectl get pods -n kube-system | grep -i load-balancer
 실제 원인 후보:
 
 - AWS Load Balancer Controller 미설치
-- controller IRSA trust policy가 이전 OIDC를 가리킴
+- `aws_load_balancer_controller_irsa_role_arn` output 또는 service account annotation 불일치
 
 ### 증상 3. Karpenter NodeClaim은 생기는데 node가 `Ready`가 안 됨
 
 가장 먼저 볼 것:
 
-- `aws eks create-access-entry`가 적용됐는지
+- Terraform `aws_eks_access_entry.karpenter_node`가 state에 있고 plan이 깨끗한지
 - `EC2NodeClass` subnet ID가 현재 private subnet과 맞는지
 
 ### 증상 4. observability만 `Degraded`
@@ -406,10 +402,9 @@ kubectl describe pod -n bodybuddy-system -l app.kubernetes.io/name=prometheus-op
 2. `redisAddr`
 3. `dbPassword`
 4. `private_subnet_ids -> EC2NodeClass`
-5. EKS OIDC -> ALB Controller trust policy
-6. ALB DNS
+5. ALB DNS
 
-즉 지금 상태에서는 destroy/reapply를 **완전 무인 복구**라고 보면 안 된다.
+즉 지금 상태에서는 destroy/reapply를 **완전 무인 복구**라고 보긴 어렵지만, 핵심 반복 작업은 `bootstrap-cluster-addons.sh`와 `refresh-dev-values.sh`로 상당 부분 줄어든 상태다.
 
 ---
 
@@ -428,13 +423,12 @@ kubectl describe pod -n bodybuddy-system -l app.kubernetes.io/name=prometheus-op
 3. **Karpenter EC2NodeClass에서 subnet ID 직접 박기 제거**
    - 태그 selector 기반으로 변경
 
-4. **ALB Controller 설치와 trust policy 처리 코드화**
-   - Terraform + ArgoCD/Helm으로 일관화
+4. **ALB Controller Helm 설치까지 GitOps화**
+   - IAM은 Terraform 관리 완료
+   - 현재 Helm 설치는 bootstrap 스크립트 담당
+   - 장기적으로는 ArgoCD app 또는 Terraform Helm provider 중 하나로 일관화 가능
 
-5. **Karpenter node access entry 코드화**
-   - `aws_eks_access_entry` 리소스로 옮기기
-
-6. **observability admission secret 원인 제거**
+5. **observability admission secret 원인 제거**
    - chart values 정합성 재검토 또는 secret lifecycle 코드화
 
 ---
@@ -451,15 +445,13 @@ kubectl describe pod -n bodybuddy-system -l app.kubernetes.io/name=prometheus-op
 ### reapply 후
 
 1. `terraform apply`
-2. `aws eks update-kubeconfig`
+2. `bodybuddy-infra/scripts/bootstrap-cluster-addons.sh`
 3. `terraform output` 재확인
-4. Helm values drift 수정
-5. ArgoCD 재설치
-6. app-of-apps 재적용
-7. Karpenter / node access entry 확인
-8. ALB Controller 재설치 확인
-9. observability admission secret 확인
-10. 앱 readiness / ingress / ArgoCD health 검증
+4. `bodybuddy-infra/scripts/refresh-dev-values.sh`
+5. 변경된 values/karpenter manifest diff 확인 후 commit/push
+6. Karpenter / ALB Controller pod 확인
+7. observability admission secret 확인
+8. 앱 readiness / ingress / ArgoCD health 검증
 
 ---
 
@@ -477,4 +469,4 @@ kubectl describe pod -n bodybuddy-system -l app.kubernetes.io/name=prometheus-op
 1. `DB_PASSWORD` 드리프트
 2. `dbHost` / `redisAddr` 드리프트
 3. `EC2NodeClass` subnet ID 드리프트
-4. ALB Controller / OIDC trust / access entry 같은 Terraform 밖 수동 리소스
+4. ArgoCD/Karpenter/ALB Controller 같은 클러스터 애드온 재부트스트랩
