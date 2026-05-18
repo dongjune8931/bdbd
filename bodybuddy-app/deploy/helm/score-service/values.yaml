@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: 902371998304.dkr.ecr.ap-northeast-2.amazonaws.com/bodybuddy-dev-score-service
-  tag: 169c82d
+  tag: aafee2d
   pullPolicy: IfNotPresent
 
 serviceAccount:
@@ -63,7 +63,7 @@ config:
 
 secrets:
   dbUser: bodybuddy
-  dbPassword: "8nMP#dVju?GRQdmiL5bZANN>pUS$"
+  dbPassword: '8nMP#dVju?GRQdmiL5bZANN>pUS$'
   redisPassword: ""
   jwtSecret: "bodybuddy-dev-jwt-secret-2026-user-service"
 
