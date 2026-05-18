@@ -9,7 +9,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  project: bodybuddy
+  project: default
   source:
     repoURL: https://kubernetes-sigs.github.io/metrics-server/
     chart: metrics-server
