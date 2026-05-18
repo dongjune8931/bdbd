@@ -1,6 +1,7 @@
 .PHONY: build test lint \
 	run-user-service run-score-service run-analysis-worker run-notification-worker \
-	docker-build migrate-up migrate-down
+	docker-build migrate-up migrate-down \
+	load-upload-smoke load-ranking-smoke
 
 # Build all binaries.
 build:
@@ -42,3 +43,15 @@ migrate-up:
 # Roll back migrations.
 migrate-down:
 	docker exec -i bodybuddy-postgres psql -U bodybuddy -d bodybuddy < migrations/000001_init.down.sql
+
+# Run k6 upload smoke/load scenario against user-service.
+# Example:
+#   K6_BASE_URL=http://localhost:8080 K6_TOKEN=... make load-upload-smoke
+load-upload-smoke:
+	k6 run test/load/upload-burst.js
+
+# Run k6 ranking read scenario against score-service.
+# Example:
+#   K6_SCORE_BASE_URL=http://localhost:8081 make load-ranking-smoke
+load-ranking-smoke:
+	k6 run test/load/ranking-read.js

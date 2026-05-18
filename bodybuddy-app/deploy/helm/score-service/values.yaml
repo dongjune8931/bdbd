@@ -38,10 +38,10 @@ resources:
     memory: 256Mi
 
 autoscaling:
-  enabled: false
+  enabled: true
   minReplicas: 1
-  maxReplicas: 3
-  targetCPUUtilizationPercentage: 70
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 50
 
 pdb:
   enabled: true
