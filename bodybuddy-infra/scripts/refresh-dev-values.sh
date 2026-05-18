@@ -85,8 +85,8 @@ done
 echo "Updating $KARPENTER_NODE_CLASS"
 PRIVATE_SUBNET_IDS="$private_subnet_ids" perl -0pi -e '
   my @subnet_ids = split /,/, $ENV{"PRIVATE_SUBNET_IDS"};
-  my $replacement = "subnetSelectorTerms:\n" . join("", map { "  - id: $_\n" } @subnet_ids);
-  s/subnetSelectorTerms:\n(?:  - id: .+\n)+/$replacement/s;
+  my $replacement = "subnetSelectorTerms:\n" . join("", map { "    - id: $_\n" } @subnet_ids);
+  s/subnetSelectorTerms:\n(?:\s+- id: .+\n)+/$replacement/s;
 ' "$KARPENTER_NODE_CLASS"
 
 echo "Refresh complete."

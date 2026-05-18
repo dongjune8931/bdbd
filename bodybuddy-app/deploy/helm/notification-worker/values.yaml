@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: 902371998304.dkr.ecr.ap-northeast-2.amazonaws.com/bodybuddy-dev-notification-worker
-  tag: aafee2d
+  tag: 011d1c1
   pullPolicy: IfNotPresent
 
 serviceAccount:
@@ -56,7 +56,7 @@ config:
 
 secrets:
   dbUser: bodybuddy
-  dbPassword: '8nMP#dVju?GRQdmiL5bZANN>pUS$'
+  dbPassword: 'zS(-haBep3ihk.nchUjV5n4N7qC['
   redisPassword: ""
   jwtSecret: "bodybuddy-dev-jwt-secret-2026-user-service"
 
