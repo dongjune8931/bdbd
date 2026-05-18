@@ -243,6 +243,23 @@ subnetSelectorTerms:
 
 ### 4.6 ArgoCD 재설치
 
+반복 설치를 줄이기 위해 아래 스크립트를 우선 사용한다.
+
+```bash
+AWS_PROFILE=terraform-bodybuddy \
+  /Users/idongjun/Desktop/Project/bdbd_prog/bodybuddy-infra/scripts/bootstrap-cluster-addons.sh
+```
+
+이 스크립트는 다음을 idempotent하게 수행한다.
+
+- kubeconfig 갱신
+- `bodybuddy-system`, `karpenter` namespace 생성
+- ArgoCD Helm 설치
+- Karpenter CRD/controller 설치
+- AWS Load Balancer Controller OIDC trust 갱신
+- AWS Load Balancer Controller Helm 설치
+- ArgoCD project/app-of-apps 적용
+
 destroy 후에는 ArgoCD CRD 자체가 사라지므로 다시 설치해야 한다.
 
 ```bash

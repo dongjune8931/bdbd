@@ -121,6 +121,16 @@ module "karpenter" {
   tags                      = local.common_tags
 }
 
+resource "aws_eks_access_entry" "karpenter_node" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = module.karpenter.node_iam_role_arn
+  type          = "EC2_LINUX"
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-karpenter-node-access-entry"
+  })
+}
+
 module "rds" {
   source = "../../modules/rds"
 
