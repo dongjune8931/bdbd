@@ -1,15 +1,15 @@
-# Phase 7: DR Drill - S3 Auto Recovery and RDS PITR
+# 07. DR Drill - S3 Auto Recovery and RDS PITR
 
 ## Overview
 
-Phase 7의 목표는 "복구가 된다"를 말로 끝내지 않고, 실제 장애 시나리오를 실행해 RTO/RPO를 측정 가능한 형태로 남기는 것이다.
+이 드릴의 목표는 "복구가 된다"를 말로 끝내지 않고, 실제 장애 시나리오를 실행해 RTO/RPO를 측정 가능한 형태로 남기는 것이다.
 
 이번 드릴에서는 두 축을 검증했다.
 
 1. `S3` 객체 삭제 시 자동 복구
 2. `RDS PostgreSQL` 데이터 손실 후 PITR 복원
 
-관련 캡처와 원본 증거는 [phase-7-dr evidence](./evidence/phase-7-dr/README.md) 구조 아래에 정리한다.
+관련 캡처와 원본 증거는 [DR evidence](./evidence/07-dr-drill/README.md) 구조 아래에 정리한다.
 
 ---
 
@@ -32,7 +32,7 @@ Versioning과 EventBridge, Lambda를 조합해 S3 객체 삭제 시 delete marke
 
 ### 1.3 시나리오
 
-1. 테스트 파일 `dr-tests/phase7-auto-recovery.txt` 업로드
+1. 테스트 파일 `<S3_TEST_OBJECT_KEY>` 업로드
 2. `list-object-versions`로 삭제 전 최신 버전 확인
 3. `delete-object` 실행
 4. Lambda 로그와 S3 version 상태를 확인해 자동 복구 여부 검증
@@ -48,7 +48,7 @@ Versioning과 EventBridge, Lambda를 조합해 S3 객체 삭제 시 delete marke
 {
   "msg": "s3 auto recovery finished",
   "bucket": "bodybuddy-dev-inbody",
-  "key": "dr-tests/phase7-auto-recovery.txt",
+  "key": "<S3_TEST_OBJECT_KEY>",
   "recovered": true,
   "delete_marker_version_id": "3AptvY6h4RDriVYndzE2V.BCodoQEo60",
   "duration_ms": 1247
@@ -65,26 +65,26 @@ Versioning과 EventBridge, Lambda를 조합해 S3 객체 삭제 시 delete marke
 
 ### 1.6 증거
 
-- [evidence/phase-7-dr/01-s3-auto-recovery/01-before-delete-object-version.png](./evidence/phase-7-dr/01-s3-auto-recovery/01-before-delete-object-version.png)
-- [evidence/phase-7-dr/01-s3-auto-recovery/02-after-auto-recovery-version.png](./evidence/phase-7-dr/01-s3-auto-recovery/02-after-auto-recovery-version.png)
-- [evidence/phase-7-dr/01-s3-auto-recovery/03-lambda-recovery-log-console.png](./evidence/phase-7-dr/01-s3-auto-recovery/03-lambda-recovery-log-console.png)
-- [evidence/phase-7-dr/01-s3-auto-recovery/04-cloudwatch-recovered-metric.png](./evidence/phase-7-dr/01-s3-auto-recovery/04-cloudwatch-recovered-metric.png)
+- [evidence/07-dr-drill/01-s3-auto-recovery/01-before-delete-object-version.png](./evidence/07-dr-drill/01-s3-auto-recovery/01-before-delete-object-version.png)
+- [evidence/07-dr-drill/01-s3-auto-recovery/02-after-auto-recovery-version.png](./evidence/07-dr-drill/01-s3-auto-recovery/02-after-auto-recovery-version.png)
+- [evidence/07-dr-drill/01-s3-auto-recovery/03-lambda-recovery-log-console.png](./evidence/07-dr-drill/01-s3-auto-recovery/03-lambda-recovery-log-console.png)
+- [evidence/07-dr-drill/01-s3-auto-recovery/04-cloudwatch-recovered-metric.png](./evidence/07-dr-drill/01-s3-auto-recovery/04-cloudwatch-recovered-metric.png)
 
 삭제 전 버전 상태:
 
-![S3 delete before version](./evidence/phase-7-dr/01-s3-auto-recovery/01-before-delete-object-version.png)
+![S3 delete before version](./evidence/07-dr-drill/01-s3-auto-recovery/01-before-delete-object-version.png)
 
 자동 복구 후 최신 객체 버전 복귀:
 
-![S3 auto recovery result](./evidence/phase-7-dr/01-s3-auto-recovery/02-after-auto-recovery-version.png)
+![S3 auto recovery result](./evidence/07-dr-drill/01-s3-auto-recovery/02-after-auto-recovery-version.png)
 
 Lambda 복구 성공 로그:
 
-![S3 recovery lambda log](./evidence/phase-7-dr/01-s3-auto-recovery/03-lambda-recovery-log-console.png)
+![S3 recovery lambda log](./evidence/07-dr-drill/01-s3-auto-recovery/03-lambda-recovery-log-console.png)
 
 CloudWatch 복구 메트릭:
 
-![S3 recovery metric](./evidence/phase-7-dr/01-s3-auto-recovery/04-cloudwatch-recovered-metric.png)
+![S3 recovery metric](./evidence/07-dr-drill/01-s3-auto-recovery/04-cloudwatch-recovered-metric.png)
 
 ---
 
@@ -110,7 +110,7 @@ RDS PostgreSQL에서 테스트 레코드를 의도적으로 삭제한 뒤, PITR�
 
 테스트 기준 레코드:
 
-- email: `phase7-pitr-20260518@example.com`
+- email: `<PITR_TEST_EMAIL>`
 - name: `PITR Character`
 - level: `7`
 - total_score: `777`
@@ -172,31 +172,31 @@ The specified instance cannot be restored to a time later than 2026-05-18T14:33:
 
 ### 2.7 증거
 
-- [evidence/phase-7-dr/03-rds-pitr/01-rds-backup-precheck.png](./evidence/phase-7-dr/03-rds-pitr/01-rds-backup-precheck.png)
-- [evidence/phase-7-dr/03-rds-pitr/02-empty-db-before-migration.png](./evidence/phase-7-dr/03-rds-pitr/02-empty-db-before-migration.png)
-- [evidence/phase-7-dr/03-rds-pitr/03-baseline-record-before-loss.png](./evidence/phase-7-dr/03-rds-pitr/03-baseline-record-before-loss.png)
-- [evidence/phase-7-dr/03-rds-pitr/04-record-missing-after-delete.png](./evidence/phase-7-dr/03-rds-pitr/04-record-missing-after-delete.png)
-- [evidence/phase-7-dr/03-rds-pitr/05-pitr-instance-available.png](./evidence/phase-7-dr/03-rds-pitr/05-pitr-instance-available.png)
+- [evidence/07-dr-drill/03-rds-pitr/01-rds-backup-precheck.png](./evidence/07-dr-drill/03-rds-pitr/01-rds-backup-precheck.png)
+- [evidence/07-dr-drill/03-rds-pitr/02-empty-db-before-migration.png](./evidence/07-dr-drill/03-rds-pitr/02-empty-db-before-migration.png)
+- [evidence/07-dr-drill/03-rds-pitr/03-baseline-record-before-loss.png](./evidence/07-dr-drill/03-rds-pitr/03-baseline-record-before-loss.png)
+- [evidence/07-dr-drill/03-rds-pitr/04-record-missing-after-delete.png](./evidence/07-dr-drill/03-rds-pitr/04-record-missing-after-delete.png)
+- [evidence/07-dr-drill/03-rds-pitr/05-pitr-instance-available.png](./evidence/07-dr-drill/03-rds-pitr/05-pitr-instance-available.png)
 
 백업 보존 및 복원 가능 시점 사전 확인:
 
-![RDS backup precheck](./evidence/phase-7-dr/03-rds-pitr/01-rds-backup-precheck.png)
+![RDS backup precheck](./evidence/07-dr-drill/03-rds-pitr/01-rds-backup-precheck.png)
 
 마이그레이션 전 빈 데이터베이스 상태:
 
-![Empty database before migration](./evidence/phase-7-dr/03-rds-pitr/02-empty-db-before-migration.png)
+![Empty database before migration](./evidence/07-dr-drill/03-rds-pitr/02-empty-db-before-migration.png)
 
 복구 기준 레코드 생성:
 
-![Baseline record before loss](./evidence/phase-7-dr/03-rds-pitr/03-baseline-record-before-loss.png)
+![Baseline record before loss](./evidence/07-dr-drill/03-rds-pitr/03-baseline-record-before-loss.png)
 
 삭제 후 데이터 손실 상태:
 
-![Record missing after delete](./evidence/phase-7-dr/03-rds-pitr/04-record-missing-after-delete.png)
+![Record missing after delete](./evidence/07-dr-drill/03-rds-pitr/04-record-missing-after-delete.png)
 
 PITR 복원 인스턴스 available 상태:
 
-![PITR instance available](./evidence/phase-7-dr/03-rds-pitr/05-pitr-instance-available.png)
+![PITR instance available](./evidence/07-dr-drill/03-rds-pitr/05-pitr-instance-available.png)
 
 ---
 

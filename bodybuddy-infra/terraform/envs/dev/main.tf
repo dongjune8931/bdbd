@@ -38,6 +38,16 @@ module "s3" {
   tags        = local.common_tags
 }
 
+module "s3_auto_recovery" {
+  source = "../../modules/lambda-s3-recovery"
+
+  function_name = "${local.name_prefix}-s3-auto-recovery"
+  bucket_name   = module.s3.bucket_name
+  bucket_arn    = module.s3.bucket_arn
+  package_path  = "${path.module}/../../../lambda/s3-auto-recovery/dist/bootstrap.zip"
+  tags          = local.common_tags
+}
+
 module "sqs" {
   source = "../../modules/sqs"
 

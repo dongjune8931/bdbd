@@ -1,12 +1,12 @@
-# Phase 7 DR Evidence
+# 07. DR Evidence
 
-Phase 7 DR 시연 중 캡처와 원본 증거를 모아두는 폴더다.
+DR 시연 중 캡처와 원본 증거를 모아두는 폴더다.
 
 Codex가 진행 중에 다음 형식으로 요청하면, 해당 경로와 파일명으로 저장한다.
 
 ```text
 지금 캡처:
-bodybuddy-infra/reports/evidence/phase-7-dr/<section>/<filename>.png
+bodybuddy-infra/reports/evidence/07-dr-drill/<section>/<filename>.png
 ```
 
 ## Folder Map

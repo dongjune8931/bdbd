@@ -1,40 +1,95 @@
 # bodybuddy-infra
 
-Terraform and GitOps assets for BodyBuddy infrastructure.
+Terraform, ArgoCD, runbook, and report assets for the BodyBuddy AWS environment.
 
-## Demo Reports
+This repository area is the operational side of BodyBuddy. It describes how the dev environment is created, how GitOps converges the cluster, and how recovery and load-test evidence is preserved.
 
-- [Phase 6: Karpenter + Spot Drill](./reports/phase-6-spot-interruption-drill.md)
-- [Phase 7: DR Drill - S3 Auto Recovery and RDS PITR](./reports/phase-7-dr-drill.md)
+## Scope
+
+| Area | Contents |
+|---|---|
+| Terraform | VPC, EKS, Karpenter, RDS, ElastiCache, S3, SQS, ECR, IAM/IRSA |
+| GitOps | ArgoCD App-of-Apps, service applications, observability, cost tooling |
+| Recovery | RDS PITR, S3 object recovery, GitOps cluster recovery |
+| Reports | RTO/RPO matrix, Spot interruption drill, load-test results |
+
+## Directory Map
+
+```text
+terraform/
+  envs/dev/             # dev environment entrypoint
+  modules/              # reusable AWS infrastructure modules
+
+argocd/
+  app-of-apps.yaml      # root application
+  apps/                 # child applications and AppProject
+  karpenter/            # NodePool and EC2NodeClass manifests
+
+runbooks/
+  destroy-reapply-recovery.md
+  gitops-cluster-recovery.md
+  rds-pitr-restore.md
+  s3-mass-delete-recovery.md
+
+reports/
+  README.md
+  rto-rpo-matrix.md
+  load-test-report.md
+  evidence/
+```
+
+## Main Reports
+
 - [RTO / RPO Matrix](./reports/rto-rpo-matrix.md)
-- [Phase 7 Evidence Index](./reports/evidence/phase-7-dr/README.md)
-- [RDS PITR Restore Runbook](./runbooks/rds-pitr-restore.md)
-- [S3 Mass Delete Recovery Runbook](./runbooks/s3-mass-delete-recovery.md)
-- [GitOps Cluster Recovery Runbook](./runbooks/gitops-cluster-recovery.md)
+- [Load Test Report](./reports/load-test-report.md)
+- [Reports Index](./reports/README.md)
 
-앞으로 시연/드릴 문서는 `reports/` 아래에 phase별 문서로 추가하고, 캡처와 원본 증거는 `reports/evidence/` 아래에 연결하는 방식으로 정리한다.
+Detailed drill reports and raw screenshots live under `reports/` and `reports/evidence/`.
 
-## Phase 2 scope
+## Runbooks
 
-This repository starts Phase 2 by scaffolding:
+- [Destroy / Reapply Recovery](./runbooks/destroy-reapply-recovery.md)
+- [RDS PITR Restore](./runbooks/rds-pitr-restore.md)
+- [S3 Mass Delete Recovery](./runbooks/s3-mass-delete-recovery.md)
+- [GitOps Cluster Recovery](./runbooks/gitops-cluster-recovery.md)
 
-- Terraform repository structure
-- `terraform/envs/dev` entrypoint
-- Shared tags and naming locals
-- Initial module implementations for `vpc`, `s3`, `sqs`, and `ecr`
-- Module skeletons for `eks`, `karpenter`, `rds`, `elasticache`, and `iam-irsa`
+## Apply Flow
 
-## Important notes
+```bash
+AWS_PROFILE=terraform-bodybuddy \
+terraform -chdir=bodybuddy-infra/terraform/envs/dev apply
+```
 
-- Replace placeholder values such as `<ACCOUNT_ID>` and `<GITHUB_USER>` before real apply.
-- The Terraform backend bucket and lock table are intentionally not created here.
-- Backend bootstrap must be done manually once, per the project spec.
+After the AWS resources are recreated, bootstrap cluster add-ons:
 
-## Next slice
+```bash
+AWS_PROFILE=terraform-bodybuddy \
+bodybuddy-infra/scripts/bootstrap-cluster-addons.sh
+```
 
-The next Phase 2 iteration should implement:
+Then refresh values that drift after recreation:
 
-1. EKS cluster wrapper
-2. Karpenter bootstrap path
-3. RDS and ElastiCache modules
-4. `envs/dev` wiring for the remaining modules
+```bash
+AWS_PROFILE=terraform-bodybuddy \
+bodybuddy-infra/scripts/refresh-dev-values.sh
+```
+
+## Verification
+
+```bash
+kubectl get applications -n bodybuddy-system
+kubectl get pods -n bodybuddy
+kubectl get nodes --show-labels
+kubectl get hpa -n bodybuddy
+```
+
+Expected steady state:
+
+- ArgoCD applications are `Synced Healthy`
+- API workloads run on `critical-pool / on-demand`
+- Worker workloads run on `batch-pool / spot`
+- `score-service` HPA is available after metrics-server is synced
+
+## Cost Note
+
+The dev environment is not intended to run all day. When testing is finished, destroy the environment to avoid idle EKS, RDS, ElastiCache, ALB, and node cost.

@@ -18,6 +18,16 @@ output "s3_bucket_name" {
   value       = module.s3.bucket_name
 }
 
+output "s3_auto_recovery_lambda_name" {
+  description = "Lambda function name for S3 delete marker auto recovery."
+  value       = module.s3_auto_recovery.function_name
+}
+
+output "s3_auto_recovery_event_rule_name" {
+  description = "EventBridge rule name for S3 auto recovery."
+  value       = module.s3_auto_recovery.event_rule_name
+}
+
 output "analysis_queue_url" {
   description = "Analysis queue URL."
   value       = module.sqs.analysis_queue_url

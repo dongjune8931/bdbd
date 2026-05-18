@@ -8,8 +8,8 @@
 
 관련 상세 보고서:
 
-- [DR Drill - S3 Auto Recovery and RDS PITR](./phase-7-dr-drill.md)
-- [Karpenter + Spot Drill](./phase-6-spot-interruption-drill.md)
+- [DR Drill - S3 Auto Recovery and RDS PITR](./07-dr-drill.md)
+- [Karpenter + Spot Drill](./06-spot-interruption-drill.md)
 
 ---
 
@@ -18,7 +18,7 @@
 | 장애 유형 | RTO 목표 | RTO 실측 | RPO 목표 | RPO 실측 | 자동화 | 근거 |
 |---|---:|---:|---:|---:|---|---|
 | Pod 다운 | 30초 | 미측정 | 0 | 0 | 자동 | Kubernetes self-heal, 향후 별도 GitOps/K8s 복구 드릴로 보강 |
-| Node 다운 / Spot interruption | 2분 | 드릴 완료, 상세 수치 후속 보강 | 0 | 0 | 자동 | [phase-6-spot-interruption-drill.md](./phase-6-spot-interruption-drill.md) |
+| Node 다운 / Spot interruption | 2분 | 드릴 완료, 상세 수치 후속 보강 | 0 | 0 | 자동 | [06-spot-interruption-drill.md](./06-spot-interruption-drill.md) |
 | Deployment 강제 삭제 | 5분 | 미측정 | 0 | 0 | 자동 | ArgoCD self-heal 시연 이력 있음, 별도 evidence 보강 필요 |
 | S3 객체 삭제 | 2분 | 약 1.247초 | 0 | 0 | 자동 | Lambda 로그 `duration_ms=1247`, CloudWatch metric `S3AutoRecoveryRecoveredObjects` |
 | RDS 데이터 손실 | 15분 | 1차 드릴에서 `available` 도달 확인, 정밀 분 단위 후속 보강 필요 | 5분 | 수 분 지연 관찰 | 반자동 | PITR restore 성공, `LatestRestorableTime` 지연 관찰 |
@@ -29,7 +29,7 @@
 
 ### S3 객체 삭제
 
-- 테스트 객체: `dr-tests/phase7-auto-recovery.txt`
+- 테스트 객체: `<S3_TEST_OBJECT_KEY>`
 - 삭제 후 Lambda가 delete marker를 제거하고 원본 객체를 자동 복구했다.
 - 복구 성공 로그:
 
@@ -44,7 +44,7 @@
 
 ### RDS 데이터 손실
 
-- 테스트 레코드 `phase7-pitr-20260518@example.com` 생성 후 삭제
+- 테스트 레코드 `<PITR_TEST_EMAIL>` 생성 후 삭제
 - `restore-db-instance-to-point-in-time`로 `bodybuddy-dev-postgres-pitr-20260518` 복원 인스턴스 생성
 - 최종 `available` 상태 도달까지는 확인했지만, 이번 1차 드릴에서는 시작/종료 시각을 별도 타이머로 엄밀하게 재지 않아 분 단위 최종 수치는 후속 보정이 필요하다.
 - 다만 다음 두 가지 운영 포인트는 확실히 확인했다.

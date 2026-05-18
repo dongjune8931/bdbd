@@ -1,7 +1,7 @@
 .DS_Store
 
-# Markdown docs stay local
-*.md
+# Local handoff notes stay local
+HANDOFF.md
 
 # Local tool state
 .claude/
