@@ -2,9 +2,13 @@
 
 > 인바디 결과를 점수화해 캐릭터를 키우는 헬스 서비스 — AWS EKS 위에서 비동기 MSA를 운영하며 GitOps, 관측성, Spot 비용 최적화, DR을 실제 증거로 구현한 클라우드 인프라 포트폴리오
 
-## 아키텍처
+## 서비스 아키텍처
 
 ![BodyBuddy Architecture](./bdbd_main_arc.drawio.png)
+
+### 인바디 업로드 비동기 처리 흐름
+
+![Inbody Upload Async Flow](./inbody_upload_diagram.png)
 
 ## 기술 스택
 
