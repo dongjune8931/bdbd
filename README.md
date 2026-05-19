@@ -10,6 +10,12 @@
 
 ![Inbody Upload Async Flow](./inbody_upload_diagram.png)
 
+## DR
+
+### S3 백업 / 복구
+
+![S3 DR](./s3_dr.png)
+
 ## 기술 스택
 
 | 분류 | 기술 |
