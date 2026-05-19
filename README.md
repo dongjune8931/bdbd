@@ -1,6 +1,27 @@
 # BodyBuddy
 
-BodyBuddy는 인바디 결과 업로드를 점수화해 캐릭터 성장과 랭킹으로 연결하는 헬스 서비스다. 이 저장소의 핵심 목표는 서비스 기능 자체보다, **AWS EKS 위에서 비동기 MSA를 운영하면서 GitOps, 관측성, Spot 비용 최적화, DR, 부하 테스트를 실제 증거로 남기는 것**이다.
+> 인바디 결과를 점수화해 캐릭터를 키우는 헬스 서비스 — AWS EKS 위에서 비동기 MSA를 운영하며 GitOps, 관측성, Spot 비용 최적화, DR을 실제 증거로 구현한 클라우드 인프라 포트폴리오
+
+## 아키텍처
+
+![BodyBuddy Architecture](./bdbd_main_arc.drawio.png)
+
+## 기술 스택
+
+| 분류 | 기술 |
+|---|---|
+| **언어 / 프레임워크** | Go 1.24, Gin, pgx/v5, go-redis/v9, aws-sdk-go-v2 |
+| **로깅 / 메트릭 / 트레이싱** | slog (JSON), Prometheus, OpenTelemetry (OTLP), Grafana Tempo |
+| **컨테이너** | Docker (멀티스테이지), distroless/static-debian12:nonroot |
+| **오케스트레이션** | AWS EKS 1.33, Karpenter v1.x (critical-pool on-demand / batch-pool Spot) |
+| **GitOps / CI-CD** | ArgoCD (App-of-Apps), GitHub Actions (OIDC → ECR push) |
+| **IaC** | Terraform ~>1.9 (VPC, EKS, Karpenter, RDS, ElastiCache, S3, SQS, Lambda, ECR, IAM/IRSA) |
+| **데이터 스토어** | RDS PostgreSQL 15 (PITR, SSE), ElastiCache Redis 7 (TLS, Sorted Set 랭킹) |
+| **메시징** | SQS (analysis-queue / notification-queue + DLQ), EventBridge |
+| **보안** | IRSA (서비스별 최소 권한), AWS Secrets Manager, SSE-KMS, S3 Object Lock |
+| **관측성 스택** | kube-prometheus-stack, OTel Collector, Grafana Tempo, KubeCost |
+| **부하 테스트** | k6 (upload-burst / ranking-read 시나리오) |
+| **이메일** | AWS SES |
 
 ## What This Project Proves
 
