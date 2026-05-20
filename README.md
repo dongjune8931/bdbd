@@ -16,6 +16,14 @@
 
 ![S3 DR](./s3_dr.png)
 
+S3 객체 삭제 이벤트는 EventBridge와 Lambda로 연결하고, 최신 delete marker를 제거해 이전 버전을 다시 현재 버전으로 복원한다. 복구 결과는 SES 메일과 Grafana 대시보드로 함께 남겨 운영자가 삭제 감지 시점의 상태와 복구 성공 여부를 바로 확인할 수 있게 했다.
+
+| 자동 복구 알림 메일 | DR 대시보드 |
+|---|---|
+| ![S3 DR Mail](./bodybuddy-infra/reports/evidence/05-observability/dr_S3_mail.png) | ![S3 DR Dashboard](./bodybuddy-infra/reports/evidence/05-observability/03-dr-dashboard-overview.png) |
+
+메일에는 삭제 비율, 임계값, 삭제 마커 수, 복구 결과를 요약했고, 대시보드에는 자동 복구 호출 수, 복구된 객체 수, 실패 수, 복구 전 삭제 비율을 시각화했다.
+
 ## 기술 스택
 
 | 분류 | 기술 |
