@@ -10,6 +10,52 @@
 
 ![Inbody Upload Async Flow](./inbody_upload_diagram.png)
 
+### 서비스 흐름
+
+```text
+Client
+  |
+  | POST /api/v1/uploads
+  v
+user-service
+  |
+  | SQS message
+  v
+analysis-worker
+  |
+  | POST /internal/v1/score
+  v
+score-service
+  |
+  | notification event
+  v
+notification-worker
+```
+
+Runtime placement:
+
+| Workload | NodePool | Capacity | Reason |
+|---|---|---|---|
+| `user-service` | `critical-pool` | on-demand | user-facing API, lower latency sensitivity |
+| `score-service` | `critical-pool` | on-demand | ranking/read API, HPA target |
+| `analysis-worker` | `batch-pool` | spot | async processing, retryable with SQS |
+| `notification-worker` | `batch-pool` | spot | async notification, delay-tolerant |
+
+---
+
+## What This Project Proves
+
+| 영역 | 구현 내용 | 검증 증거 |
+|---|---|---|
+| MSA on EKS | Go 기반 API 2개와 worker 2개를 EKS에 배포 | ArgoCD 전체 `Synced Healthy`, 서비스별 readiness 확인 |
+| GitOps | ArgoCD App-of-Apps로 Helm chart 관리 | Git 변경 후 자동 sync, self-heal 운영 |
+| 비동기 처리 | `user-service -> SQS -> analysis-worker -> score-service` 흐름 | 업로드 후 score 반영, worker 로그 |
+| Spot 운영 | API는 on-demand, worker는 Spot 노드로 분리 | Spot 노드 drain, re-queue, 새 worker 재처리 |
+| DR | S3 자동 복구, RDS PITR, 복구 런북 | Lambda 로그, RDS restore, RTO/RPO 매트릭스 |
+| 부하 테스트 | k6 기반 upload/ranking 측정과 HPA 튜닝 | `p95 417.59ms -> 35.65ms`, `1 -> 4 replicas` |
+
+---
+
 ## DR
 
 현재 BodyBuddy에 구현한 복구 전략은 세 가지다. Kubernetes와 ArgoCD는 Pod/Deployment 삭제 시 선언형 상태를 기준으로 서비스를 다시 복구하고, batch 워커는 SQS 메시지를 성공 시에만 삭제하도록 구성해 interruption 이후에도 다른 worker가 메시지를 재처리할 수 있다. 여기에 `upload_id` 기반 멱등성 처리를 더해 동일한 분석 결과가 다시 들어와도 중복 반영되지 않게 했다.
@@ -63,6 +109,14 @@
 
 Batch worker는 Spot 노드에서 실행하지만, SQS visibility timeout과 멱등성 처리로 interruption 이후에도 메시지 유실 없이 안전하게 재처리할 수 있도록 설계했다.
 
+Core log:
+
+```text
+context cancelled during mock OCR sleep, re-queuing message
+shutdown signal received, stopping polling loop
+all in-flight messages processed
+```
+
 ### S3 백업 / 복구
 
 ![S3 DR](./s3_dr.png)
@@ -77,6 +131,29 @@ S3 객체 삭제 이벤트는 EventBridge와 Lambda로 연결하고, 최신 dele
 <p align="center"><em>자동 복구 알림 메일 &nbsp;&nbsp;&nbsp; DR 대시보드</em></p>
 
 메일에는 삭제 비율, 임계값, 삭제 마커 수, 복구 결과를 요약했고, 대시보드에는 자동 복구 호출 수, 복구된 객체 수, 실패 수, 복구 전 삭제 비율을 시각화했다.
+
+### RDS PITR
+
+| Scenario | Result |
+|---|---|
+| S3 object delete | Lambda가 delete marker를 제거해 약 `1.247s`에 자동 복구 |
+| RDS data loss | PITR restore로 새 DB 인스턴스 `available` 도달 확인 |
+| Recovery matrix | RTO/RPO 목표와 실측값을 표로 정리 |
+
+---
+
+## 부하 테스트 및 오토스케일링
+
+`score-service` ranking read 부하를 기준으로 HPA 적용 전후를 비교했다.
+
+| Test | Before | After |
+|---|---:|---:|
+| Throughput | `377.35 req/s` | `572.03 req/s` |
+| p95 latency | `417.59ms` | `35.65ms` |
+| Error rate | `0%` | `0%` |
+| Replicas | `1` | `4` |
+
+---
 
 ## 기술 스택
 
@@ -95,47 +172,7 @@ S3 객체 삭제 이벤트는 EventBridge와 Lambda로 연결하고, 최신 dele
 | **부하 테스트** | k6 (upload-burst / ranking-read 시나리오) |
 | **이메일** | AWS SES |
 
-## What This Project Proves
-
-| 영역 | 구현 내용 | 검증 증거 |
-|---|---|---|
-| MSA on EKS | Go 기반 API 2개와 worker 2개를 EKS에 배포 | ArgoCD 전체 `Synced Healthy`, 서비스별 readiness 확인 |
-| GitOps | ArgoCD App-of-Apps로 Helm chart 관리 | Git 변경 후 자동 sync, self-heal 운영 |
-| 비동기 처리 | `user-service -> SQS -> analysis-worker -> score-service` 흐름 | 업로드 후 score 반영, worker 로그 |
-| Spot 운영 | API는 on-demand, worker는 Spot 노드로 분리 | Spot 노드 drain, re-queue, 새 worker 재처리 |
-| DR | S3 자동 복구, RDS PITR, 복구 런북 | Lambda 로그, RDS restore, RTO/RPO 매트릭스 |
-| 부하 테스트 | k6 기반 upload/ranking 측정과 HPA 튜닝 | `p95 417.59ms -> 35.65ms`, `1 -> 4 replicas` |
-
-## Architecture
-
-```text
-Client
-  |
-  | POST /api/v1/uploads
-  v
-user-service
-  |
-  | SQS message
-  v
-analysis-worker
-  |
-  | POST /internal/v1/score
-  v
-score-service
-  |
-  | notification event
-  v
-notification-worker
-```
-
-Runtime placement:
-
-| Workload | NodePool | Capacity | Reason |
-|---|---|---|---|
-| `user-service` | `critical-pool` | on-demand | user-facing API, lower latency sensitivity |
-| `score-service` | `critical-pool` | on-demand | ranking/read API, HPA target |
-| `analysis-worker` | `batch-pool` | spot | async processing, retryable with SQS |
-| `notification-worker` | `batch-pool` | spot | async notification, delay-tolerant |
+---
 
 ## Repository Layout
 
@@ -154,47 +191,7 @@ bodybuddy-infra/
   reports/             # drill reports, RTO/RPO, load test results
 ```
 
-## Key Results
-
-### Spot Interruption Drill
-
-Worker Pod가 올라간 Spot 노드를 drain해 interruption 흐름을 재현했다.
-
-Observed behavior:
-
-- `analysis-worker`가 처리 중이던 메시지를 중단 시점에 re-queue
-- 새 Spot 노드에 worker가 재스케줄
-- re-queued 메시지가 새 worker에서 다시 처리
-- 최종 score 반영으로 메시지 유실 없이 복구 확인
-
-Core log:
-
-```text
-context cancelled during mock OCR sleep, re-queuing message
-shutdown signal received, stopping polling loop
-all in-flight messages processed
-```
-
-### DR Drill
-
-S3와 RDS에 대해 실제 복구 흐름을 실행했다.
-
-| Scenario | Result |
-|---|---|
-| S3 object delete | Lambda가 delete marker를 제거해 약 `1.247s`에 자동 복구 |
-| RDS data loss | PITR restore로 새 DB 인스턴스 `available` 도달 확인 |
-| Recovery matrix | RTO/RPO 목표와 실측값을 표로 정리 |
-
-### Load Test and Autoscaling
-
-`score-service` ranking read 부하를 기준으로 HPA 적용 전후를 비교했다.
-
-| Test | Before | After |
-|---|---:|---:|
-| Throughput | `377.35 req/s` | `572.03 req/s` |
-| p95 latency | `417.59ms` | `35.65ms` |
-| Error rate | `0%` | `0%` |
-| Replicas | `1` | `4` |
+---
 
 ## Main Documents
 
@@ -209,6 +206,8 @@ S3와 RDS에 대해 실제 복구 흐름을 실행했다.
 - [S3 Recovery Runbook](./bodybuddy-infra/runbooks/s3-mass-delete-recovery.md)
 - [GitOps Recovery Runbook](./bodybuddy-infra/runbooks/gitops-cluster-recovery.md)
 - [Demo Video Script](./bodybuddy-infra/reports/demo-video-script.md)
+
+---
 
 ## Local Load Test
 
@@ -228,6 +227,8 @@ cd bodybuddy-app
 K6_SCORE_BASE_URL=http://localhost:8081 \
 make load-ranking-smoke
 ```
+
+---
 
 ## Operational Notes
 
