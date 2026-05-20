@@ -48,6 +48,12 @@ variable "alert_email_to" {
   default     = []
 }
 
+variable "recovery_delete_ratio_threshold" {
+  description = "Deletion ratio percentage threshold included in DR metrics and notification emails."
+  type        = number
+  default     = 3
+}
+
 variable "tags" {
   description = "Common tags applied to resources."
   type        = map(string)

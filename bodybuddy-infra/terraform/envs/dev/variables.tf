@@ -212,3 +212,9 @@ variable "dr_alert_email_to" {
   type        = list(string)
   default     = ["ldj990517@gmail.com"]
 }
+
+variable "dr_delete_ratio_threshold" {
+  description = "Deletion ratio percentage threshold used in S3 DR email summaries and dashboard metrics."
+  type        = number
+  default     = 3
+}

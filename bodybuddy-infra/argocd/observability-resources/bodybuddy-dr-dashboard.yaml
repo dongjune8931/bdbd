@@ -234,7 +234,23 @@ data:
               "color": {
                 "mode": "thresholds"
               },
-              "unit": "ms"
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "yellow",
+                    "value": 3
+                  },
+                  {
+                    "color": "red",
+                    "value": 10
+                  }
+                ]
+              },
+              "unit": "percent"
             },
             "overrides": []
           },
@@ -265,7 +281,7 @@ data:
                 "type": "cloudwatch",
                 "uid": "bodybuddy-cloudwatch"
               },
-              "metricName": "S3AutoRecoveryDurationMilliseconds",
+              "metricName": "S3DeletionRatioPercent",
               "namespace": "BodyBuddy/DR",
               "metricEditorMode": 0,
               "metricQueryType": 0,
@@ -277,7 +293,7 @@ data:
               "period": "60"
             }
           ],
-          "title": "Lambda 실행 시간",
+          "title": "삭제 비율",
           "type": "stat"
         },
         {

@@ -114,10 +114,11 @@ resource "aws_lambda_function" "this" {
 
   environment {
     variables = {
-      BUCKET_NAME      = var.bucket_name
-      METRIC_NAMESPACE = var.metric_namespace
-      ALERT_EMAIL_FROM = var.alert_email_from != null ? var.alert_email_from : ""
-      ALERT_EMAIL_TO   = join(",", var.alert_email_to)
+      BUCKET_NAME                      = var.bucket_name
+      METRIC_NAMESPACE                 = var.metric_namespace
+      ALERT_EMAIL_FROM                 = var.alert_email_from != null ? var.alert_email_from : ""
+      ALERT_EMAIL_TO                   = join(",", var.alert_email_to)
+      RECOVERY_DELETE_RATIO_THRESHOLD  = tostring(var.recovery_delete_ratio_threshold)
     }
   }
 
