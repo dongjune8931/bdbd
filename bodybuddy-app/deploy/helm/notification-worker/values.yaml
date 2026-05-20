@@ -52,7 +52,7 @@ config:
   metricsPort: 9091
   sesRegion: ap-northeast-2
   sesEndpoint: ""
-  fromEmail: bodybuddy@example.com
+  fromEmail: ldj990517@gmail.com
 
 secrets:
   dbUser: bodybuddy
