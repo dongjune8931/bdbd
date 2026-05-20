@@ -146,8 +146,8 @@ S3 객체 삭제 이벤트는 EventBridge와 Lambda로 연결하고, 최신 dele
 
 kube-prometheus-stack으로 Prometheus + Grafana를 올리고, CloudWatch 데이터소스를 연결해 서비스 RED 메트릭과 DR 지표를 단일 화면에서 확인할 수 있도록 구성했다.
 
-<!-- 아래 이미지: 01-bodybuddy-service-overview-dashboard.png -->
-![BodyBuddy Service Overview Dashboard]()
+<img width="1121" height="848" alt="01-bodybuddy-service-overview-dashboard" src="https://github.com/user-attachments/assets/5622e182-e644-4dfa-9466-8ccf1b92f7d8" />
+
 
 ---
 
