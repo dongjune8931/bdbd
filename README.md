@@ -20,6 +20,49 @@
 | Spot / worker 종료 | SIGTERM graceful shutdown + SQS 재노출 | 신규 polling 중단, in-flight 처리 후 종료, 다른 worker 재처리 |
 | S3 객체 삭제 | Versioning + Object Lock + EventBridge + Lambda | 최신 delete marker 제거, 이전 버전 자동 복원, 메일/대시보드 기록 |
 
+### Spot 중단 시 Worker 재처리 흐름
+
+```text
+                    Spot Node
+                       │
+          ┌────────────┴────────────┐
+          │      analysis-worker    │
+          │   · polls SQS           │
+          │   · processes message   │
+          └────────────┬────────────┘
+                       │
+              Interruption notice
+              (node drain / SIGTERM)
+                       │
+          ┌────────────┴────────────┐
+          │    Graceful shutdown    │
+          │  · stop polling         │
+          │  · finish in-flight     │
+          │  · NO DeleteMessage     │
+          └────────────┬────────────┘
+                       │
+            visibility timeout expires
+                       │
+          ┌────────────┴────────────┐
+          │   Message reappears     │
+          │   in analysis-queue     │
+          └────────────┬────────────┘
+                       │
+          ┌────────────┴────────────┐
+          │      New worker         │
+          │ rescheduled by Karpenter│
+          │   on another node       │
+          └────────────┬────────────┘
+                       │
+          ┌────────────┴────────────┐
+          │      score-service      │
+          │  · idempotent update    │
+          │  · upload_id dedup      │
+          └─────────────────────────┘
+```
+
+Batch worker는 Spot 노드에서 실행하지만, SQS visibility timeout과 멱등성 처리로 interruption 이후에도 메시지 유실 없이 안전하게 재처리할 수 있도록 설계했다.
+
 ### S3 백업 / 복구
 
 ![S3 DR](./s3_dr.png)
