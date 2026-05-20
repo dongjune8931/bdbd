@@ -38,6 +38,9 @@ spec:
               enabled: true
               label: grafana_datasource
               labelValue: "1"
+          grafana.ini:
+            feature_toggles:
+              dashboardScene: false
           service:
             type: ClusterIP
           ingress:
