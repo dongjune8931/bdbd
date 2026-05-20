@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: 902371998304.dkr.ecr.ap-northeast-2.amazonaws.com/bodybuddy-dev-score-service
-  tag: latest
+  tag: 9e8ff68
   pullPolicy: IfNotPresent
 
 serviceAccount:
@@ -61,6 +61,7 @@ config:
   analysisQueueUrl: https://sqs.ap-northeast-2.amazonaws.com/902371998304/bodybuddy-dev-analysis-queue
   notificationQueueUrl: https://sqs.ap-northeast-2.amazonaws.com/902371998304/bodybuddy-dev-notification-queue
   s3Bucket: bodybuddy-dev-inbody
+  otelEndpoint: "otel-collector-opentelemetry-collector.bodybuddy-system:4317"
 
 secrets:
   dbUser: bodybuddy
