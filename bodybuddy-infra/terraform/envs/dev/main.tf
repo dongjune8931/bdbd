@@ -478,6 +478,43 @@ module "elasticache" {
   tags                                  = local.common_tags
 }
 
+data "aws_iam_policy_document" "user_service_irsa" {
+  statement {
+    sid    = "AnalysisQueueSend"
+    effect = "Allow"
+    actions = [
+      "sqs:GetQueueAttributes",
+      "sqs:GetQueueUrl",
+      "sqs:SendMessage",
+    ]
+    resources = [module.sqs.analysis_queue_arn]
+  }
+
+  statement {
+    sid    = "InbodyBucketWrite"
+    effect = "Allow"
+    actions = [
+      "s3:AbortMultipartUpload",
+      "s3:PutObject",
+      "s3:PutObjectTagging",
+    ]
+    resources = ["${module.s3.bucket_arn}/*"]
+  }
+}
+
+data "aws_iam_policy_document" "score_service_irsa" {
+  statement {
+    sid    = "NotificationQueueSend"
+    effect = "Allow"
+    actions = [
+      "sqs:GetQueueAttributes",
+      "sqs:GetQueueUrl",
+      "sqs:SendMessage",
+    ]
+    resources = [module.sqs.notification_queue_arn]
+  }
+}
+
 data "aws_iam_policy_document" "analysis_worker_irsa" {
   statement {
     sid    = "AnalysisQueueAccess"
@@ -561,6 +598,32 @@ data "aws_iam_policy_document" "grafana_irsa" {
     ]
     resources = ["*"]
   }
+}
+
+module "user_service_irsa" {
+  source = "../../modules/iam-irsa"
+
+  role_name            = "${local.name_prefix}-user-service-irsa"
+  policy_name          = "${local.name_prefix}-user-service-irsa"
+  policy_json          = data.aws_iam_policy_document.user_service_irsa.json
+  oidc_provider        = module.eks.oidc_provider
+  oidc_provider_arn    = module.eks.oidc_provider_arn
+  namespace            = local.app_namespace
+  service_account_name = "user-service"
+  tags                 = local.common_tags
+}
+
+module "score_service_irsa" {
+  source = "../../modules/iam-irsa"
+
+  role_name            = "${local.name_prefix}-score-service-irsa"
+  policy_name          = "${local.name_prefix}-score-service-irsa"
+  policy_json          = data.aws_iam_policy_document.score_service_irsa.json
+  oidc_provider        = module.eks.oidc_provider
+  oidc_provider_arn    = module.eks.oidc_provider_arn
+  namespace            = local.app_namespace
+  service_account_name = "score-service"
+  tags                 = local.common_tags
 }
 
 module "analysis_worker_irsa" {
