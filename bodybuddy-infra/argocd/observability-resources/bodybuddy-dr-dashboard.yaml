@@ -84,7 +84,8 @@ data:
               "queryMode": "Metrics",
               "refId": "A",
               "region": "ap-northeast-2",
-              "statistic": "Sum"
+              "statistic": "Sum",
+              "period": "86400"
             }
           ],
           "title": "자동 복구 호출",
@@ -143,7 +144,8 @@ data:
               "queryMode": "Metrics",
               "refId": "A",
               "region": "ap-northeast-2",
-              "statistic": "Sum"
+              "statistic": "Sum",
+              "period": "86400"
             }
           ],
           "title": "복구된 객체",
@@ -206,7 +208,8 @@ data:
               "queryMode": "Metrics",
               "refId": "A",
               "region": "ap-northeast-2",
-              "statistic": "Sum"
+              "statistic": "Sum",
+              "period": "86400"
             }
           ],
           "title": "복구 실패",
@@ -258,7 +261,8 @@ data:
               "queryMode": "Metrics",
               "refId": "A",
               "region": "ap-northeast-2",
-              "statistic": "Average"
+              "statistic": "Average",
+              "period": "86400"
             }
           ],
           "title": "Lambda 실행 시간",
@@ -311,7 +315,8 @@ data:
               "queryMode": "Metrics",
               "refId": "A",
               "region": "ap-northeast-2",
-              "statistic": "Average"
+              "statistic": "Average",
+              "period": "86400"
             }
           ],
           "title": "Lambda 실행 시간 추이",
@@ -366,7 +371,8 @@ data:
               "queryMode": "Metrics",
               "refId": "A",
               "region": "ap-northeast-2",
-              "statistic": "Sum"
+              "statistic": "Sum",
+              "period": "86400"
             },
             {
               "datasource": {
@@ -381,7 +387,8 @@ data:
               "queryMode": "Metrics",
               "refId": "B",
               "region": "ap-northeast-2",
-              "statistic": "Sum"
+              "statistic": "Sum",
+              "period": "86400"
             }
           ],
           "title": "Lambda 호출 / 오류",
