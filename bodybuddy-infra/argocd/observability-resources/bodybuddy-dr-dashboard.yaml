@@ -293,7 +293,7 @@ data:
               "period": "60"
             }
           ],
-          "title": "삭제 비율",
+          "title": "삭제 비율 (복구 전)",
           "type": "stat"
         },
         {

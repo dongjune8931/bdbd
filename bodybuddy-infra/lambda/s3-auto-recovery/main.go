@@ -96,21 +96,32 @@ func main() {
 func (h handler) handle(ctx context.Context, event events.CloudWatchEvent) (recoveryResult, error) {
 	started := time.Now()
 
+	preRecovery, detailErr := h.extractDeleteEvent(event)
+	if detailErr != nil {
+		preRecovery.DurationMS = time.Since(started).Milliseconds()
+		preRecovery.DeletionRatioThreshold = h.deleteThreshold
+		return preRecovery, detailErr
+	}
+
+	if preRecovery.Bucket != "" {
+		stats, statsErr := h.collectBucketStats(ctx, preRecovery.Bucket)
+		if statsErr != nil {
+			h.logger.Warn("collecting pre-recovery bucket stats", "bucket", preRecovery.Bucket, "error", statsErr)
+		} else {
+			preRecovery.ActiveObjects = stats.ActiveObjects
+			preRecovery.DeleteMarkers = stats.DeleteMarkers
+			preRecovery.DeletionRatioPercent = stats.DeletionRatioPercent
+			preRecovery.ThresholdExceeded = stats.DeletionRatioPercent >= h.deleteThreshold
+		}
+	}
+
 	result, err := h.recoverDeleteMarker(ctx, event)
 	result.DurationMS = time.Since(started).Milliseconds()
 	result.DeletionRatioThreshold = h.deleteThreshold
-
-	if result.Bucket != "" {
-		stats, statsErr := h.collectBucketStats(ctx, result.Bucket)
-		if statsErr != nil {
-			h.logger.Warn("collecting bucket stats", "bucket", result.Bucket, "error", statsErr)
-		} else {
-			result.ActiveObjects = stats.ActiveObjects
-			result.DeleteMarkers = stats.DeleteMarkers
-			result.DeletionRatioPercent = stats.DeletionRatioPercent
-			result.ThresholdExceeded = stats.DeletionRatioPercent >= h.deleteThreshold
-		}
-	}
+	result.ActiveObjects = preRecovery.ActiveObjects
+	result.DeleteMarkers = preRecovery.DeleteMarkers
+	result.DeletionRatioPercent = preRecovery.DeletionRatioPercent
+	result.ThresholdExceeded = preRecovery.ThresholdExceeded
 
 	metricErr := h.putMetrics(ctx, result, err)
 	if metricErr != nil {
@@ -137,7 +148,7 @@ func (h handler) handle(ctx context.Context, event events.CloudWatchEvent) (reco
 	return result, nil
 }
 
-func (h handler) recoverDeleteMarker(ctx context.Context, event events.CloudWatchEvent) (recoveryResult, error) {
+func (h handler) extractDeleteEvent(event events.CloudWatchEvent) (recoveryResult, error) {
 	var detail s3ObjectDeletedDetail
 	if err := json.Unmarshal(event.Detail, &detail); err != nil {
 		return recoveryResult{Message: "invalid event detail"}, fmt.Errorf("unmarshal event detail: %w", err)
@@ -160,6 +171,17 @@ func (h handler) recoverDeleteMarker(ctx context.Context, event events.CloudWatc
 		result.Message = "missing bucket or key"
 		return result, fmt.Errorf("missing bucket or key in event: bucket=%q key=%q", bucket, key)
 	}
+
+	return result, nil
+}
+
+func (h handler) recoverDeleteMarker(ctx context.Context, event events.CloudWatchEvent) (recoveryResult, error) {
+	result, err := h.extractDeleteEvent(event)
+	if err != nil {
+		return result, err
+	}
+	bucket := result.Bucket
+	key := result.Key
 
 	versions, err := h.s3.ListObjectVersions(ctx, &s3.ListObjectVersionsInput{
 		Bucket:  aws.String(bucket),
@@ -302,7 +324,7 @@ func (h handler) sendRecoveryEmail(ctx context.Context, result recoveryResult, r
 
 	subject := fmt.Sprintf("[BodyBuddy DR] S3 삭제 감지 - %s", status)
 	body := fmt.Sprintf(
-		"BodyBuddy S3 자동 복구 실행\n\n시간: %s\n버킷: %s\n이벤트 객체: %s\n삭제 사유: %s\n삭제 타입: %s\n\n삭제 통계:\n- 삭제 비율: %.2f%%\n- 임계값: %.2f%%\n- 현재 활성 객체: %d개\n- 현재 삭제 마커: %d개\n- 임계값 초과 여부: %t\n\n복구 결과:\n- 복구 여부: %t\n- 복구된 객체 수: %d개\n- 삭제 마커 버전: %s\n- 처리 시간(ms): %d\n- 결과 메시지: %s\n",
+		"BodyBuddy S3 자동 복구 실행\n\n시간: %s\n버킷: %s\n이벤트 객체: %s\n삭제 사유: %s\n삭제 타입: %s\n\n삭제 통계 (복구 전 기준):\n- 삭제 비율: %.2f%%\n- 임계값: %.2f%%\n- 활성 객체 수: %d개\n- 삭제 마커 수: %d개\n- 임계값 초과 여부: %t\n\n복구 결과:\n- 복구 여부: %t\n- 복구된 객체 수: %d개\n- 삭제 마커 버전: %s\n- 처리 시간(ms): %d\n- 결과 메시지: %s\n",
 		time.Now().Format("2006-01-02 15:04:05 MST"),
 		result.Bucket,
 		result.Key,
