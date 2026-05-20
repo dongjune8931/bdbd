@@ -28,7 +28,7 @@ spec:
             create: true
             name: grafana
             annotations:
-              eks.amazonaws.com/role-arn: __GRAFANA_IRSA_ROLE_ARN__
+              eks.amazonaws.com/role-arn: arn:aws:iam::902371998304:role/bodybuddy-dev-grafana-irsa
           sidecar:
             dashboards:
               enabled: true
