@@ -20,7 +20,9 @@ S3 객체 삭제 이벤트는 EventBridge와 Lambda로 연결하고, 최신 dele
 
 | 자동 복구 알림 메일 | DR 대시보드 |
 |---|---|
-| ![S3 DR Mail](./bodybuddy-infra/reports/evidence/05-observability/dr_S3_mail.png) | ![S3 DR Dashboard](./bodybuddy-infra/reports/evidence/05-observability/03-dr-dashboard-overview.png) |
+| <img width="492" height="531" alt="dr_S3_mail" src="https://github.com/user-attachments/assets/c62702fe-54e7-41b1-b594-50aa24b4d4df" />
+ | <img width="1139" height="803" alt="03-dr-dashboard-overview" src="https://github.com/user-attachments/assets/18d0561b-629a-4ce6-89b0-c3ebf1ad9eb8" />
+ |
 
 메일에는 삭제 비율, 임계값, 삭제 마커 수, 복구 결과를 요약했고, 대시보드에는 자동 복구 호출 수, 복구된 객체 수, 실패 수, 복구 전 삭제 비율을 시각화했다.
 
