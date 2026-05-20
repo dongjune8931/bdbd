@@ -93,6 +93,11 @@ output "notification_worker_irsa_role_arn" {
   value       = module.notification_worker_irsa.role_arn
 }
 
+output "grafana_irsa_role_arn" {
+  description = "IAM role ARN for the Grafana service account."
+  value       = module.grafana_irsa.role_arn
+}
+
 output "rds_endpoint" {
   description = "RDS PostgreSQL endpoint."
   value       = module.rds.endpoint

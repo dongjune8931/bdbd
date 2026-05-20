@@ -1,0 +1,15 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="256" height="256" rx="36" fill="#F0FDF4"/>
+  <rect x="56" y="60" width="144" height="112" rx="18" fill="#16A34A"/>
+  <rect x="72" y="78" width="112" height="76" rx="10" fill="white" fill-opacity="0.14"/>
+  <path d="M80 136L106 112L126 126L154 94L176 108" stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="80" cy="136" r="7" fill="white"/>
+  <circle cx="106" cy="112" r="7" fill="white"/>
+  <circle cx="126" cy="126" r="7" fill="white"/>
+  <circle cx="154" cy="94" r="7" fill="white"/>
+  <circle cx="176" cy="108" r="7" fill="white"/>
+  <rect x="112" y="172" width="32" height="14" rx="7" fill="#15803D"/>
+  <rect x="94" y="186" width="68" height="10" rx="5" fill="#14532D" fill-opacity="0.18"/>
+  <rect x="41" y="206" width="174" height="28" rx="14" fill="#DCFCE7"/>
+  <text x="128" y="225" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#166534">metrics-server</text>
+</svg>

@@ -5,6 +5,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TF_DIR="$ROOT_DIR/bodybuddy-infra/terraform/envs/dev"
 HELM_DIR="$ROOT_DIR/bodybuddy-app/deploy/helm"
 KARPENTER_NODE_CLASS="$ROOT_DIR/bodybuddy-infra/argocd/karpenter/ec2-node-class.yaml"
+OBSERVABILITY_APP="$ROOT_DIR/bodybuddy-infra/argocd/apps/observability.yaml"
+DR_DASHBOARD="$ROOT_DIR/bodybuddy-infra/argocd/observability-resources/bodybuddy-dr-dashboard.yaml"
 
 AWS_PROFILE="${AWS_PROFILE:-terraform-bodybuddy}"
 AWS_REGION="${AWS_REGION:-ap-northeast-2}"
@@ -21,6 +23,8 @@ notification_queue_url="$(jq -r '.notification_queue_url.value' <<<"$tf_outputs"
 s3_bucket_name="$(jq -r '.s3_bucket_name.value' <<<"$tf_outputs")"
 rds_secret_arn="$(jq -r '.rds_master_user_secret_arn.value' <<<"$tf_outputs")"
 private_subnet_ids="$(jq -r '.private_subnet_ids.value | join(",")' <<<"$tf_outputs")"
+grafana_irsa_role_arn="$(jq -r '.grafana_irsa_role_arn.value' <<<"$tf_outputs")"
+s3_auto_recovery_lambda_name="$(jq -r '.s3_auto_recovery_lambda_name.value' <<<"$tf_outputs")"
 
 echo "Reading current RDS password from Secrets Manager"
 secret_string="$(aws secretsmanager get-secret-value \
@@ -88,5 +92,15 @@ PRIVATE_SUBNET_IDS="$private_subnet_ids" perl -0pi -e '
   my $replacement = "subnetSelectorTerms:\n" . join("", map { "    - id: $_\n" } @subnet_ids);
   s/subnetSelectorTerms:\n(?:\s+- id: .+\n)+/$replacement/s;
 ' "$KARPENTER_NODE_CLASS"
+
+echo "Updating $OBSERVABILITY_APP"
+GRAFANA_IRSA_ROLE_ARN="$grafana_irsa_role_arn" perl -0pi -e '
+  s#(^\\s*eks\\.amazonaws\\.com/role-arn:\\s*).*\$#$1$ENV{"GRAFANA_IRSA_ROLE_ARN"}#m;
+' "$OBSERVABILITY_APP"
+
+echo "Updating $DR_DASHBOARD"
+S3_AUTO_RECOVERY_LAMBDA_NAME="$s3_auto_recovery_lambda_name" perl -0pi -e '
+  s#(\"FunctionName\":\\s*\").*?(\")#$1$ENV{"S3_AUTO_RECOVERY_LAMBDA_NAME"}$2#g;
+' "$DR_DASHBOARD"
 
 echo "Refresh complete."

@@ -6,6 +6,9 @@
 
 | 문서 | 내용 |
 |---|---|
+| [Presentation Outline](./presentation-architecture-implementation-outline.md) | 아키텍처, 운영, 복구, 비용 최적화 중심 발표 설계안 |
+| [Diagram Blueprints](./presentation-diagram-blueprints.md) | 전체 아키텍처, GitOps, DR, 서비스 흐름 다이어그램 초안 |
+| [Monitoring Scorecard Plan](./monitoring-performance-scorecard.md) | 커스텀 메트릭, Grafana 대시보드, before/after 성능 개선 장표 설계 |
 | [RTO / RPO Matrix](./rto-rpo-matrix.md) | 장애 유형별 복구 목표와 관찰값 |
 | [Load Test Report](./load-test-report.md) | k6 부하 테스트와 HPA 튜닝 결과 |
 | [Spot Interruption Drill](./06-spot-interruption-drill.md) | worker spot 노드 축출, re-queue, 재처리 검증 |

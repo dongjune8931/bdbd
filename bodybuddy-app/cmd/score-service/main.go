@@ -34,7 +34,6 @@ func main() {
 
 	reg := observability.NewRegistry()
 	metrics := observability.NewMetrics(cfg.ServiceName, reg)
-	_ = metrics
 
 	dbPool, err := db.New(context.Background(), cfg.DSN(), 8)
 	if err != nil {
@@ -67,14 +66,14 @@ func main() {
 	// Public ranking endpoints (read-heavy, no auth required).
 	v1 := r.Group("/api/v1")
 	{
-		v1.GET("/ranking", getRankingHandler(rdb))
+		v1.GET("/ranking", getRankingHandler(rdb, metrics))
 		v1.GET("/score/:user_id", getScoreHandler(dbPool, rdb))
 	}
 
 	// Internal endpoint called by analysis-worker.
 	internal := r.Group("/internal/v1")
 	{
-		internal.POST("/score", updateScoreHandler(cfg, dbPool, rdb, sqsClient))
+		internal.POST("/score", updateScoreHandler(cfg, dbPool, rdb, sqsClient, metrics))
 	}
 
 	// Protected user endpoints.
@@ -116,8 +115,9 @@ func main() {
 }
 
 // getRankingHandler returns top-N ranking from Redis sorted set.
-func getRankingHandler(rdb *redis.Client) gin.HandlerFunc {
+func getRankingHandler(rdb *redis.Client, metrics *observability.Metrics) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		start := time.Now()
 		limitStr := c.DefaultQuery("limit", "10")
 		limit, err := strconv.ParseInt(limitStr, 10, 64)
 		if err != nil || limit <= 0 || limit > 100 {
@@ -130,6 +130,7 @@ func getRankingHandler(rdb *redis.Client) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 			return
 		}
+		metrics.RankingReadDuration.Observe(time.Since(start).Seconds())
 
 		c.JSON(http.StatusOK, gin.H{"ranking": ranking})
 	}
@@ -165,7 +166,7 @@ type updateScoreRequest struct {
 }
 
 // updateScoreHandler is called by analysis-worker after Mock OCR processing.
-func updateScoreHandler(cfg *config.ScoreService, pool *db.Pool, rdb *redis.Client, sqsClient *queue.Client) gin.HandlerFunc {
+func updateScoreHandler(cfg *config.ScoreService, pool *db.Pool, rdb *redis.Client, sqsClient *queue.Client, metrics *observability.Metrics) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req updateScoreRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -183,6 +184,7 @@ func updateScoreHandler(cfg *config.ScoreService, pool *db.Pool, rdb *redis.Clie
 		inserted, err := domain.UpdateScore(c.Request.Context(), pool.Pool, rdb, entry)
 		if err != nil {
 			slog.Error("failed to update score", "user_id", req.UserID, "error", err)
+			metrics.ScoreUpdatesTotal.WithLabelValues("error").Inc()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 			return
 		}
@@ -205,6 +207,11 @@ func updateScoreHandler(cfg *config.ScoreService, pool *db.Pool, rdb *redis.Clie
 			"upload_id", req.UploadID,
 			"score", req.Score,
 		)
+		if inserted {
+			metrics.ScoreUpdatesTotal.WithLabelValues("success").Inc()
+		} else {
+			metrics.ScoreUpdatesTotal.WithLabelValues("duplicate").Inc()
+		}
 
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "score": req.Score})
 	}

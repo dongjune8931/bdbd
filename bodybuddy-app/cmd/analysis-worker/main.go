@@ -14,16 +14,16 @@ import (
 	"syscall"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/bodybuddy/app/internal/cache"
 	"github.com/bodybuddy/app/internal/config"
 	"github.com/bodybuddy/app/internal/db"
-	bbhttp "github.com/bodybuddy/app/internal/http"
 	"github.com/bodybuddy/app/internal/domain"
+	bbhttp "github.com/bodybuddy/app/internal/http"
 	"github.com/bodybuddy/app/internal/observability"
 	"github.com/bodybuddy/app/internal/queue"
 	"github.com/gin-gonic/gin"
@@ -212,6 +212,7 @@ func processMessage(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *
 		slog.Warn("context cancelled during mock OCR sleep, re-queuing message",
 			"message_id", msg.MessageID,
 		)
+		metrics.AnalysisJobsProcessed.WithLabelValues("retry").Inc()
 		return
 	}
 
@@ -231,6 +232,7 @@ func processMessage(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *
 			"error", err,
 		)
 		span.SetStatus(codes.Error, err.Error())
+		metrics.AnalysisJobsProcessed.WithLabelValues("failure").Inc()
 		// Do not delete — let SQS retry (up to maxReceiveCount=3) before DLQ.
 		return
 	}
@@ -243,6 +245,8 @@ func processMessage(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *
 	duration := time.Since(start)
 	metrics.SQSMessagesProcessed.WithLabelValues("analysis-queue", "success").Inc()
 	metrics.SQSMessageDuration.WithLabelValues("analysis-queue").Observe(duration.Seconds())
+	metrics.AnalysisJobsProcessed.WithLabelValues("success").Inc()
+	metrics.AnalysisJobDuration.Observe(duration.Seconds())
 
 	slog.Info("message processed successfully",
 		"message_id", msg.MessageID,

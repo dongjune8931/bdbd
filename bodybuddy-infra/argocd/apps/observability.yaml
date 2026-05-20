@@ -24,6 +24,20 @@ spec:
         grafana:
           enabled: true
           adminPassword: bodybuddy-grafana-admin
+          serviceAccount:
+            create: true
+            name: grafana
+            annotations:
+              eks.amazonaws.com/role-arn: __GRAFANA_IRSA_ROLE_ARN__
+          sidecar:
+            dashboards:
+              enabled: true
+              label: grafana_dashboard
+              labelValue: "1"
+            datasources:
+              enabled: true
+              label: grafana_datasource
+              labelValue: "1"
           service:
             type: ClusterIP
           ingress:

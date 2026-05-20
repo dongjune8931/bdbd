@@ -1,0 +1,405 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bodybuddy-dr-dashboard
+  namespace: bodybuddy-system
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/part-of: bodybuddy
+data:
+  bodybuddy-dr-overview.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "editable": true,
+      "graphTooltip": 0,
+      "panels": [
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "bodybuddy-cloudwatch"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 0,
+            "y": 0
+          },
+          "id": 1,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "sum"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "cloudwatch",
+                "uid": "bodybuddy-cloudwatch"
+              },
+              "metricName": "S3AutoRecoveryTriggered",
+              "namespace": "BodyBuddy/DR",
+              "queryMode": "Metrics",
+              "refId": "A",
+              "region": "ap-northeast-2",
+              "statistic": "Sum"
+            }
+          ],
+          "title": "자동 복구 트리거",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "bodybuddy-cloudwatch"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 6,
+            "y": 0
+          },
+          "id": 2,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "sum"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "cloudwatch",
+                "uid": "bodybuddy-cloudwatch"
+              },
+              "metricName": "S3AutoRecoveryRecoveredObjects",
+              "namespace": "BodyBuddy/DR",
+              "queryMode": "Metrics",
+              "refId": "A",
+              "region": "ap-northeast-2",
+              "statistic": "Sum"
+            }
+          ],
+          "title": "복구된 객체",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "bodybuddy-cloudwatch"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green"
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 12,
+            "y": 0
+          },
+          "id": 3,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "sum"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "cloudwatch",
+                "uid": "bodybuddy-cloudwatch"
+              },
+              "metricName": "S3AutoRecoveryFailures",
+              "namespace": "BodyBuddy/DR",
+              "queryMode": "Metrics",
+              "refId": "A",
+              "region": "ap-northeast-2",
+              "statistic": "Sum"
+            }
+          ],
+          "title": "복구 실패",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "bodybuddy-cloudwatch"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 6,
+            "x": 18,
+            "y": 0
+          },
+          "id": 4,
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "cloudwatch",
+                "uid": "bodybuddy-cloudwatch"
+              },
+              "metricName": "S3AutoRecoveryDurationMilliseconds",
+              "namespace": "BodyBuddy/DR",
+              "queryMode": "Metrics",
+              "refId": "A",
+              "region": "ap-northeast-2",
+              "statistic": "Average"
+            }
+          ],
+          "title": "Lambda 실행 시간",
+          "type": "stat"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "bodybuddy-cloudwatch"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "showPoints": "never"
+              },
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 0,
+            "y": 8
+          },
+          "id": 5,
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "cloudwatch",
+                "uid": "bodybuddy-cloudwatch"
+              },
+              "metricName": "S3AutoRecoveryDurationMilliseconds",
+              "namespace": "BodyBuddy/DR",
+              "queryMode": "Metrics",
+              "refId": "A",
+              "region": "ap-northeast-2",
+              "statistic": "Average"
+            }
+          ],
+          "title": "Lambda 실행 시간 추이",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "bodybuddy-cloudwatch"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "showPoints": "never"
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 10,
+            "w": 12,
+            "x": 12,
+            "y": 8
+          },
+          "id": 6,
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "cloudwatch",
+                "uid": "bodybuddy-cloudwatch"
+              },
+              "dimensions": {
+                "FunctionName": "__S3_AUTO_RECOVERY_LAMBDA_NAME__"
+              },
+              "metricName": "Invocations",
+              "namespace": "AWS/Lambda",
+              "queryMode": "Metrics",
+              "refId": "A",
+              "region": "ap-northeast-2",
+              "statistic": "Sum"
+            },
+            {
+              "datasource": {
+                "type": "cloudwatch",
+                "uid": "bodybuddy-cloudwatch"
+              },
+              "dimensions": {
+                "FunctionName": "__S3_AUTO_RECOVERY_LAMBDA_NAME__"
+              },
+              "metricName": "Errors",
+              "namespace": "AWS/Lambda",
+              "queryMode": "Metrics",
+              "refId": "B",
+              "region": "ap-northeast-2",
+              "statistic": "Sum"
+            }
+          ],
+          "title": "Lambda 호출 / 오류",
+          "type": "timeseries"
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "style": "dark",
+      "tags": [
+        "bodybuddy",
+        "dr"
+      ],
+      "templating": {
+        "list": []
+      },
+      "time": {
+        "from": "now-7d",
+        "to": "now"
+      },
+      "timezone": "browser",
+      "title": "BodyBuddy DR Overview",
+      "version": 1
+    }

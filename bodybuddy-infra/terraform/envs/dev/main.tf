@@ -41,11 +41,13 @@ module "s3" {
 module "s3_auto_recovery" {
   source = "../../modules/lambda-s3-recovery"
 
-  function_name = "${local.name_prefix}-s3-auto-recovery"
-  bucket_name   = module.s3.bucket_name
-  bucket_arn    = module.s3.bucket_arn
-  package_path  = "${path.module}/../../../lambda/s3-auto-recovery/dist/bootstrap.zip"
-  tags          = local.common_tags
+  function_name    = "${local.name_prefix}-s3-auto-recovery"
+  bucket_name      = module.s3.bucket_name
+  bucket_arn       = module.s3.bucket_arn
+  package_path     = "${path.module}/../../../lambda/s3-auto-recovery/dist/bootstrap.zip"
+  alert_email_from = var.dr_alert_email_from
+  alert_email_to   = var.dr_alert_email_to
+  tags             = local.common_tags
 }
 
 module "sqs" {
@@ -530,6 +532,37 @@ data "aws_iam_policy_document" "notification_worker_irsa" {
   }
 }
 
+data "aws_iam_policy_document" "grafana_irsa" {
+  statement {
+    sid    = "ReadCloudWatchMetrics"
+    effect = "Allow"
+    actions = [
+      "cloudwatch:DescribeAlarms",
+      "cloudwatch:GetMetricData",
+      "cloudwatch:GetMetricStatistics",
+      "cloudwatch:ListMetrics",
+      "ec2:DescribeRegions",
+      "tag:GetResources",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "ReadCloudWatchLogs"
+    effect = "Allow"
+    actions = [
+      "logs:DescribeLogGroups",
+      "logs:DescribeLogStreams",
+      "logs:StartQuery",
+      "logs:StopQuery",
+      "logs:GetLogEvents",
+      "logs:GetLogGroupFields",
+      "logs:GetQueryResults",
+    ]
+    resources = ["*"]
+  }
+}
+
 module "analysis_worker_irsa" {
   source = "../../modules/iam-irsa"
 
@@ -553,5 +586,18 @@ module "notification_worker_irsa" {
   oidc_provider_arn    = module.eks.oidc_provider_arn
   namespace            = local.app_namespace
   service_account_name = "notification-worker"
+  tags                 = local.common_tags
+}
+
+module "grafana_irsa" {
+  source = "../../modules/iam-irsa"
+
+  role_name            = "${local.name_prefix}-grafana-irsa"
+  policy_name          = "${local.name_prefix}-grafana-irsa"
+  policy_json          = data.aws_iam_policy_document.grafana_irsa.json
+  oidc_provider        = module.eks.oidc_provider
+  oidc_provider_arn    = module.eks.oidc_provider_arn
+  namespace            = "bodybuddy-system"
+  service_account_name = "grafana"
   tags                 = local.common_tags
 }

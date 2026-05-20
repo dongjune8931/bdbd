@@ -198,6 +198,7 @@ func processNotification(ctx context.Context, cfg *config.NotificationWorker, sq
 			"user_id", payload.UserID,
 			"error", err,
 		)
+		metrics.NotificationSentTotal.WithLabelValues("failure").Inc()
 		// SES failure — do not delete, let SQS retry → DLQ.
 		return
 	}
@@ -209,6 +210,7 @@ func processNotification(ctx context.Context, cfg *config.NotificationWorker, sq
 	duration := time.Since(start)
 	metrics.SQSMessagesProcessed.WithLabelValues("notification-queue", "success").Inc()
 	metrics.SQSMessageDuration.WithLabelValues("notification-queue").Observe(duration.Seconds())
+	metrics.NotificationSentTotal.WithLabelValues("success").Inc()
 
 	slog.Info("notification sent",
 		"message_id", msg.MessageID,

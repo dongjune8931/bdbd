@@ -36,6 +36,18 @@ variable "timeout" {
   default     = 30
 }
 
+variable "alert_email_from" {
+  description = "Verified SES sender email used for S3 DR recovery notifications. Null disables email delivery."
+  type        = string
+  default     = null
+}
+
+variable "alert_email_to" {
+  description = "List of recipient emails for S3 DR recovery notifications."
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
   description = "Common tags applied to resources."
   type        = map(string)

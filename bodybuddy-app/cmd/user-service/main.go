@@ -48,7 +48,6 @@ func main() {
 
 	reg := observability.NewRegistry()
 	metrics := observability.NewMetrics(cfg.ServiceName, reg)
-	_ = metrics
 
 	dbPool, err := db.New(context.Background(), cfg.DSN(), 8)
 	if err != nil {
@@ -87,7 +86,7 @@ func main() {
 	protected.Use(auth.Middleware(cfg.JWTSecret))
 	{
 		protected.GET("/profile", getProfileHandler(dbPool))
-		protected.POST("/uploads", createUploadHandler(cfg, dbPool, sqsClient))
+		protected.POST("/uploads", createUploadHandler(cfg, dbPool, sqsClient, metrics))
 	}
 
 	addr := fmt.Sprintf(":%d", cfg.HTTPPort)
@@ -220,12 +219,13 @@ type uploadRequest struct {
 
 // createUploadHandler records an upload and enqueues it for analysis.
 // In production this would also generate a presigned S3 URL for direct client upload.
-func createUploadHandler(cfg *config.UserService, pool *db.Pool, sqsClient *queue.Client) gin.HandlerFunc {
+func createUploadHandler(cfg *config.UserService, pool *db.Pool, sqsClient *queue.Client, metrics *observability.Metrics) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		claims, _ := auth.ClaimsFromContext(c)
 
 		var req uploadRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
+			metrics.UploadRequestsTotal.WithLabelValues("rejected").Inc()
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -240,6 +240,7 @@ func createUploadHandler(cfg *config.UserService, pool *db.Pool, sqsClient *queu
 		)
 		if err != nil {
 			slog.Error("failed to create upload record", "error", err)
+			metrics.UploadRequestsTotal.WithLabelValues("error").Inc()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 			return
 		}
@@ -255,6 +256,7 @@ func createUploadHandler(cfg *config.UserService, pool *db.Pool, sqsClient *queu
 		msgID, err := sqsClient.SendMessage(c.Request.Context(), cfg.AnalysisQueueURL, msgBody, sqsAttrs)
 		if err != nil {
 			slog.Error("failed to publish to analysis queue", "error", err)
+			metrics.UploadRequestsTotal.WithLabelValues("error").Inc()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue analysis"})
 			return
 		}
@@ -264,6 +266,7 @@ func createUploadHandler(cfg *config.UserService, pool *db.Pool, sqsClient *queu
 			"upload_id", uploadID,
 			"sqs_message_id", msgID,
 		)
+		metrics.UploadRequestsTotal.WithLabelValues("accepted").Inc()
 
 		c.JSON(http.StatusCreated, gin.H{
 			"upload_id": uploadID,

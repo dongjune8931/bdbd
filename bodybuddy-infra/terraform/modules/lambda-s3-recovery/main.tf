@@ -3,6 +3,10 @@ resource "aws_s3_bucket_notification" "eventbridge" {
   eventbridge = true
 }
 
+locals {
+  email_alerts_enabled = var.alert_email_from != null && length(var.alert_email_to) > 0
+}
+
 data "aws_iam_policy_document" "assume_role" {
   statement {
     effect  = "Allow"
@@ -63,6 +67,20 @@ data "aws_iam_policy_document" "this" {
       values   = [var.metric_namespace]
     }
   }
+
+  dynamic "statement" {
+    for_each = local.email_alerts_enabled ? [1] : []
+
+    content {
+      sid    = "SendSesRecoveryAlerts"
+      effect = "Allow"
+      actions = [
+        "ses:SendEmail",
+        "ses:SendRawEmail",
+      ]
+      resources = ["*"]
+    }
+  }
 }
 
 resource "aws_iam_policy" "this" {
@@ -98,6 +116,8 @@ resource "aws_lambda_function" "this" {
     variables = {
       BUCKET_NAME      = var.bucket_name
       METRIC_NAMESPACE = var.metric_namespace
+      ALERT_EMAIL_FROM = var.alert_email_from != null ? var.alert_email_from : ""
+      ALERT_EMAIL_TO   = join(",", var.alert_email_to)
     }
   }
 

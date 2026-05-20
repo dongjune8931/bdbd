@@ -1,0 +1,8 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="256" height="256" rx="36" fill="#EEF4FF"/>
+  <polygon points="128,36 197,76 197,156 128,196 59,156 59,76" fill="#2563EB"/>
+  <path d="M96 86V146" stroke="white" stroke-width="12" stroke-linecap="round"/>
+  <path d="M160 92L116 128L160 164" stroke="white" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="36" y="196" width="184" height="28" rx="14" fill="#DBEAFE"/>
+  <text x="128" y="215" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#1E3A8A">Karpenter Controller</text>
+</svg>

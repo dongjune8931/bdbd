@@ -200,3 +200,15 @@ variable "cache_engine_version" {
   type        = string
   default     = "7.1"
 }
+
+variable "dr_alert_email_from" {
+  description = "Verified SES sender email for S3 DR recovery alerts. Null disables email notifications."
+  type        = string
+  default     = "ldj990517@gmail.com"
+}
+
+variable "dr_alert_email_to" {
+  description = "Recipient emails for S3 DR recovery alerts."
+  type        = list(string)
+  default     = ["ldj990517@gmail.com"]
+}
