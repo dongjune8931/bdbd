@@ -76,15 +76,18 @@ data:
                 "type": "cloudwatch",
                 "uid": "bodybuddy-cloudwatch"
               },
-              "metricName": "S3AutoRecoveryTriggered",
-              "namespace": "BodyBuddy/DR",
+              "dimensions": {
+                "FunctionName": "__S3_AUTO_RECOVERY_LAMBDA_NAME__"
+              },
+              "metricName": "Invocations",
+              "namespace": "AWS/Lambda",
               "queryMode": "Metrics",
               "refId": "A",
               "region": "ap-northeast-2",
               "statistic": "Sum"
             }
           ],
-          "title": "자동 복구 트리거",
+          "title": "자동 복구 호출",
           "type": "stat"
         },
         {
