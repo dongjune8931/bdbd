@@ -77,7 +77,7 @@ data:
                 "uid": "bodybuddy-cloudwatch"
               },
               "dimensions": {
-                "FunctionName": "__S3_AUTO_RECOVERY_LAMBDA_NAME__"
+                "FunctionName": "bodybuddy-dev-s3-auto-recovery"
               },
               "metricName": "Invocations",
               "namespace": "AWS/Lambda",
@@ -359,7 +359,7 @@ data:
                 "uid": "bodybuddy-cloudwatch"
               },
               "dimensions": {
-                "FunctionName": "__S3_AUTO_RECOVERY_LAMBDA_NAME__"
+                "FunctionName": "bodybuddy-dev-s3-auto-recovery"
               },
               "metricName": "Invocations",
               "namespace": "AWS/Lambda",
@@ -374,7 +374,7 @@ data:
                 "uid": "bodybuddy-cloudwatch"
               },
               "dimensions": {
-                "FunctionName": "__S3_AUTO_RECOVERY_LAMBDA_NAME__"
+                "FunctionName": "bodybuddy-dev-s3-auto-recovery"
               },
               "metricName": "Errors",
               "namespace": "AWS/Lambda",
