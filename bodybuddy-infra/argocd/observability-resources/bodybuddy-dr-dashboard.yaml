@@ -85,7 +85,7 @@ data:
               "refId": "A",
               "region": "ap-northeast-2",
               "statistic": "Sum",
-              "period": "86400"
+              "period": "60"
             }
           ],
           "title": "자동 복구 호출",
@@ -145,7 +145,7 @@ data:
               "refId": "A",
               "region": "ap-northeast-2",
               "statistic": "Sum",
-              "period": "86400"
+              "period": "60"
             }
           ],
           "title": "복구된 객체",
@@ -209,7 +209,7 @@ data:
               "refId": "A",
               "region": "ap-northeast-2",
               "statistic": "Sum",
-              "period": "86400"
+              "period": "60"
             }
           ],
           "title": "복구 실패",
@@ -262,7 +262,7 @@ data:
               "refId": "A",
               "region": "ap-northeast-2",
               "statistic": "Average",
-              "period": "86400"
+              "period": "60"
             }
           ],
           "title": "Lambda 실행 시간",
@@ -316,7 +316,7 @@ data:
               "refId": "A",
               "region": "ap-northeast-2",
               "statistic": "Average",
-              "period": "86400"
+              "period": "60"
             }
           ],
           "title": "Lambda 실행 시간 추이",
@@ -372,7 +372,7 @@ data:
               "refId": "A",
               "region": "ap-northeast-2",
               "statistic": "Sum",
-              "period": "86400"
+              "period": "60"
             },
             {
               "datasource": {
@@ -388,7 +388,7 @@ data:
               "refId": "B",
               "region": "ap-northeast-2",
               "statistic": "Sum",
-              "period": "86400"
+              "period": "60"
             }
           ],
           "title": "Lambda 호출 / 오류",
