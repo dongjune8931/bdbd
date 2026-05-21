@@ -174,6 +174,22 @@ Waterfall 화면에서는 전체 요청 시간 중 어느 구간이 오래 걸�
 <img width="1174" height="884" alt="스크린샷 2026-05-21 오후 9 05 54" src="https://github.com/user-attachments/assets/12f701bd-12bb-4fa5-94d1-0a13a69809c9" />
 Span detail에서는 `analysis-worker`의 outbound `HTTP POST`와 `score-service /internal/v1/score` server span을 함께 확인할 수 있다. 이를 통해 worker가 실제로 `score-service.bodybuddy.svc.cluster.local`로 내부 호출을 수행했고, 최종 서비스까지 trace가 전파되었음을 증명한다.
 
+---
+
+## 부하 테스트 및 오토스케일링
+
+이번 프로젝트에서 더 의미 있게 드러난 병목은 `score-service` read path보다 비동기 분석 파이프라인이었다. 업로드 burst 시 API 응답은 빠르게 유지됐지만, 단일 `analysis-worker`가 backlog를 따라가지 못해 queue depth가 빠르게 증가했다. 이후 KEDA가 SQS depth를 external metric으로 읽어 worker를 자동 확장하면서 backlog가 감소하기 시작했다.
+
+| Scenario | Before | After |
+|---|---:|---:|
+| Upload accepted | `8,900` | `8,900` burst 기준 처리 지속 |
+| API p95 | `30.35ms` | burst 동안 안정 유지 |
+| Queue backlog | `8,816` | `~8,055`에서 감소 시작 |
+| Worker replicas | `1` | `1 -> 12` |
+| Analysis job duration | `avg ~3.5s`, `p95 ~4.8~5.0s` | 큰 변화 없이 안정적 |
+
+즉 병목은 개별 job latency가 아니라 **worker capacity 부족**이었고, 해결은 **KEDA 기반 SQS autoscaling**이었다. 랭킹 조회 부하는 별도 관측 실험으로 유지했고, 해당 경로는 Redis hit 비율이 높아 `N=300~1000` 구간에서도 비교적 안정적으로 동작했다.
+
 ### Async Backlog Bottleneck and Recovery
 
 랭킹 조회 path는 Redis hit 비율이 높아 `N=300~1000` 구간에서도 비교적 안정적으로 버텼다. 대신 더 의미 있는 병목은 비동기 분석 파이프라인에서 드러났다. 업로드 burst 동안 `user-service`는 빠르게 요청을 받아들이지만, `analysis-worker`가 1개일 때는 메시지 처리량이 따라가지 못해 queue backlog가 빠르게 증가했다.
@@ -220,21 +236,6 @@ KEDA 설정을 수정한 뒤에는 `analysis-worker`가 queue depth를 external 
 
 이 섹션은 “부하가 올라가면 지표가 어떻게 반응하는가”를 보여주는 근거로 사용하고, 실제 병목 발견 + 해결 스토리는 위의 `analysis-worker` backlog 사례에 집중한다.
 
----
-
-## 부하 테스트 및 오토스케일링
-
-이번 프로젝트에서 더 의미 있게 드러난 병목은 `score-service` read path보다 비동기 분석 파이프라인이었다. 업로드 burst 시 API 응답은 빠르게 유지됐지만, 단일 `analysis-worker`가 backlog를 따라가지 못해 queue depth가 빠르게 증가했다. 이후 KEDA가 SQS depth를 external metric으로 읽어 worker를 자동 확장하면서 backlog가 감소하기 시작했다.
-
-| Scenario | Before | After |
-|---|---:|---:|
-| Upload accepted | `8,900` | `8,900` burst 기준 처리 지속 |
-| API p95 | `30.35ms` | burst 동안 안정 유지 |
-| Queue backlog | `8,816` | `~8,055`에서 감소 시작 |
-| Worker replicas | `1` | `1 -> 12` |
-| Analysis job duration | `avg ~3.5s`, `p95 ~4.8~5.0s` | 큰 변화 없이 안정적 |
-
-즉 병목은 개별 job latency가 아니라 **worker capacity 부족**이었고, 해결은 **KEDA 기반 SQS autoscaling**이었다. 랭킹 조회 부하는 별도 관측 실험으로 유지했고, 해당 경로는 Redis hit 비율이 높아 `N=300~1000` 구간에서도 비교적 안정적으로 동작했다.
 
 ---
 
@@ -242,8 +243,7 @@ KEDA 설정을 수정한 뒤에는 `analysis-worker`가 queue depth를 external 
 
 KubeCost로 클러스터 비용을 가시화하고, Karpenter consolidation으로 미사용 노드를 자동 정리해 절감 기회를 식별했다.
 
-<!-- kubecost savings 캡처 -->
-![]()
+<img width="1155" height="1127" alt="kubecost2" src="https://github.com/user-attachments/assets/5a5b2d06-770b-4347-91ca-081b1d9a12dc" />
 
 ---
 
