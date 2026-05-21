@@ -33,9 +33,9 @@ resources:
     memory: 256Mi
 
 autoscaling:
-  enabled: false
+  enabled: true
   minReplicas: 1
-  maxReplicas: 6
+  maxReplicas: 12
   pollingInterval: 15
   cooldownPeriod: 60
   queueLength: 5
