@@ -156,6 +156,7 @@ OpenTelemetry와 Tempo를 이용해 업로드 요청 이후 `user-service -> ana
 
 <!-- TODO: Node graph 캡처를 아래에 추가 -->
 <!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/07-otel-node-graph.png -->
+<img width="995" height="305" alt="스크린샷 2026-05-21 오후 9 05 19" src="https://github.com/user-attachments/assets/9d145f8b-faac-4e38-b6a7-3c200b2dd2fb" />
 
 Node graph는 서비스 간 호출 관계를 한 눈에 보여준다. 업로드 요청이 `user-service`에서 시작되고, `analysis-worker`를 거쳐 `score-service`의 내부 API로 연결되는 전체 흐름을 서비스 단위로 설명할 때 사용한다.
 
@@ -163,14 +164,14 @@ Node graph는 서비스 간 호출 관계를 한 눈에 보여준다. 업로드 
 
 <!-- TODO: Waterfall trace 캡처를 아래에 추가 -->
 <!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/08-otel-trace-waterfall.png -->
+<img width="1168" height="382" alt="스크린샷 2026-05-21 오후 9 05 34" src="https://github.com/user-attachments/assets/ff3c4bf8-eb15-4569-9ad3-ff3f0e4c9e58" />
 
 Waterfall 화면에서는 전체 요청 시간 중 어느 구간이 오래 걸렸는지 확인할 수 있다. 현재 구현에서는 `analysis-worker.processMessage` span이 가장 긴 구간으로 나타나며, Mock OCR 지연과 비동기 분석 비용이 trace 상에서 직접 드러난다.
 
 #### 3. Span Details
 
 <!-- TODO: Span details 캡처를 아래에 추가 -->
-<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/09-otel-span-details.png -->
-
+<img width="1174" height="884" alt="스크린샷 2026-05-21 오후 9 05 54" src="https://github.com/user-attachments/assets/12f701bd-12bb-4fa5-94d1-0a13a69809c9" />
 Span detail에서는 `analysis-worker`의 outbound `HTTP POST`와 `score-service /internal/v1/score` server span을 함께 확인할 수 있다. 이를 통해 worker가 실제로 `score-service.bodybuddy.svc.cluster.local`로 내부 호출을 수행했고, 최종 서비스까지 trace가 전파되었음을 증명한다.
 
 
