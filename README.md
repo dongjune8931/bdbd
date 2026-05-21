@@ -174,6 +174,53 @@ Waterfall 화면에서는 전체 요청 시간 중 어느 구간이 오래 걸�
 <img width="1174" height="884" alt="스크린샷 2026-05-21 오후 9 05 54" src="https://github.com/user-attachments/assets/12f701bd-12bb-4fa5-94d1-0a13a69809c9" />
 Span detail에서는 `analysis-worker`의 outbound `HTTP POST`와 `score-service /internal/v1/score` server span을 함께 확인할 수 있다. 이를 통해 worker가 실제로 `score-service.bodybuddy.svc.cluster.local`로 내부 호출을 수행했고, 최종 서비스까지 trace가 전파되었음을 증명한다.
 
+### Async Backlog Bottleneck and Recovery
+
+랭킹 조회 path는 Redis hit 비율이 높아 `N=300~1000` 구간에서도 비교적 안정적으로 버텼다. 대신 더 의미 있는 병목은 비동기 분석 파이프라인에서 드러났다. 업로드 burst 동안 `user-service`는 빠르게 요청을 받아들이지만, `analysis-worker`가 1개일 때는 메시지 처리량이 따라가지 못해 queue backlog가 빠르게 증가했다.
+
+이 병목은 `SQS queue depth`, `analysis-worker replica`, `CPU usage`, `job duration`을 함께 관측해 확인했고, 이후 KEDA가 queue depth를 기준으로 worker를 최대 12개까지 자동 확장하도록 수정해 backlog가 실제로 감소하기 시작하는 것을 검증했다.
+
+#### Before: Single Worker Bottleneck
+
+<!-- TODO: before 구간 캡처를 아래에 추가 -->
+<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/10-analysis-queue-depth-before.png -->
+<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/11-analysis-worker-replicas-before.png -->
+
+업로드 burst(`2026-05-22 01:50:44 ~ 01:53:44 KST`) 동안 `user-service`는 약 8,900건의 업로드 요청을 정상 수락했고 `p95 30.35ms`, `error 0%`를 유지했다. 하지만 같은 시점의 `analysis-worker`는 단일 replica로 고정되어 있었고, 그 결과 `analysis-queue` backlog가 `8,816`건까지 누적됐다.
+
+- Upload accepted: `8,900`
+- API p95: `30.35ms`
+- Queue backlog: `8,816`
+- Worker replicas: `1`
+
+#### After: KEDA-driven Worker Scale-out
+
+<!-- TODO: after 구간 캡처를 아래에 추가 -->
+<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/12-analysis-queue-depth-after.png -->
+<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/13-analysis-worker-replicas-after.png -->
+<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/14-analysis-worker-cpu-after.png -->
+<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/15-analysis-job-duration-after.png -->
+
+KEDA 설정을 수정한 뒤에는 `analysis-worker`가 queue depth를 external metric으로 정상 인식했고, `1 -> 12 replicas`까지 자동 확장됐다. 그 결과 `analysis-queue` backlog는 `~8,055` 수준에서 계속 감소하기 시작했고, worker CPU 사용량도 같은 시점에 함께 상승해 실제로 새 worker들이 작업을 처리하고 있음을 확인했다.
+
+- Queue depth observed: `~8,055` and decreasing
+- Worker replicas: `1 -> 12`
+- Worker CPU: scale-out 시점 이후 뚜렷한 상승
+- Analysis job duration: `avg ~3.5s`, `p95 ~4.8~5.0s`
+
+핵심 해석은, 병목이 개별 job latency가 아니라 **worker capacity 부족으로 인한 queue backlog**였다는 점이다. Job duration 자체는 큰 폭으로 흔들리지 않았지만, worker 수가 부족해 backlog가 누적됐고, autoscaling으로 처리량을 늘리자 backlog가 감소하기 시작했다.
+
+#### Ranking Read Load Verification
+
+랭킹 조회 경로는 별도 관측 대상이었다. `score-service`의 `GET /api/v1/ranking` trace와 `Ranking Read Duration`, `CPU Usage`, `Ready Replicas` 패널을 함께 관찰해 `N=10 -> 300` 구간에서 latency 증가, CPU 상승, HPA scale-out이 실제로 연결되어 동작함을 검증했다. 이 실험은 dramatic failure를 만들기보다는 **관측성과 오토스케일링 반응을 확인하는 목적**으로 사용했다.
+
+<!-- TODO: ranking 관측 캡처를 아래에 추가 -->
+<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/16-ranking-read-duration.png -->
+<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/17-score-service-ready-replicas.png -->
+<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/18-score-service-cpu-usage.png -->
+<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/19-score-service-ranking-trace.png -->
+
+이 섹션은 “부하가 올라가면 지표가 어떻게 반응하는가”를 보여주는 근거로 사용하고, 실제 병목 발견 + 해결 스토리는 위의 `analysis-worker` backlog 사례에 집중한다.
 
 ---
 
