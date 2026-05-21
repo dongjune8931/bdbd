@@ -224,14 +224,17 @@ KEDA 설정을 수정한 뒤에는 `analysis-worker`가 queue depth를 external 
 
 ## 부하 테스트 및 오토스케일링
 
-`score-service` ranking read 부하를 기준으로 HPA 적용 전후를 비교했다.
+이번 프로젝트에서 더 의미 있게 드러난 병목은 `score-service` read path보다 비동기 분석 파이프라인이었다. 업로드 burst 시 API 응답은 빠르게 유지됐지만, 단일 `analysis-worker`가 backlog를 따라가지 못해 queue depth가 빠르게 증가했다. 이후 KEDA가 SQS depth를 external metric으로 읽어 worker를 자동 확장하면서 backlog가 감소하기 시작했다.
 
-| Test | Before | After |
+| Scenario | Before | After |
 |---|---:|---:|
-| Throughput | `377.35 req/s` | `572.03 req/s` |
-| p95 latency | `417.59ms` | `35.65ms` |
-| Error rate | `0%` | `0%` |
-| Replicas | `1` | `4` |
+| Upload accepted | `8,900` | `8,900` burst 기준 처리 지속 |
+| API p95 | `30.35ms` | burst 동안 안정 유지 |
+| Queue backlog | `8,816` | `~8,055`에서 감소 시작 |
+| Worker replicas | `1` | `1 -> 12` |
+| Analysis job duration | `avg ~3.5s`, `p95 ~4.8~5.0s` | 큰 변화 없이 안정적 |
+
+즉 병목은 개별 job latency가 아니라 **worker capacity 부족**이었고, 해결은 **KEDA 기반 SQS autoscaling**이었다. 랭킹 조회 부하는 별도 관측 실험으로 유지했고, 해당 경로는 Redis hit 비율이 높아 `N=300~1000` 구간에서도 비교적 안정적으로 동작했다.
 
 ---
 
