@@ -40,6 +40,8 @@ spec:
               enabled: true
               label: grafana_datasource
               labelValue: "1"
+          podAnnotations:
+            karpenter.sh/do-not-disrupt: "true"
           service:
             type: ClusterIP
           ingress:
