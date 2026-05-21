@@ -14,6 +14,12 @@ spec:
     repoURL: https://kedacore.github.io/charts
     chart: keda
     targetRevision: 2.16.1
+    helm:
+      values: |
+        serviceAccount:
+          operator:
+            annotations:
+              eks.amazonaws.com/role-arn: arn:aws:iam::902371998304:role/bodybuddy-dev-keda-operator-irsa
   destination:
     server: https://kubernetes.default.svc
     namespace: keda

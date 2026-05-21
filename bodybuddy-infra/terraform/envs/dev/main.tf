@@ -601,6 +601,18 @@ data "aws_iam_policy_document" "grafana_irsa" {
   }
 }
 
+data "aws_iam_policy_document" "keda_operator_irsa" {
+  statement {
+    sid    = "AnalysisQueueScaleRead"
+    effect = "Allow"
+    actions = [
+      "sqs:GetQueueAttributes",
+      "sqs:GetQueueUrl",
+    ]
+    resources = [module.sqs.analysis_queue_arn]
+  }
+}
+
 module "user_service_irsa" {
   source = "../../modules/iam-irsa"
 
@@ -663,5 +675,18 @@ module "grafana_irsa" {
   oidc_provider_arn    = module.eks.oidc_provider_arn
   namespace            = "bodybuddy-system"
   service_account_name = "grafana"
+  tags                 = local.common_tags
+}
+
+module "keda_operator_irsa" {
+  source = "../../modules/iam-irsa"
+
+  role_name            = "${local.name_prefix}-keda-operator-irsa"
+  policy_name          = "${local.name_prefix}-keda-operator-irsa"
+  policy_json          = data.aws_iam_policy_document.keda_operator_irsa.json
+  oidc_provider        = module.eks.oidc_provider
+  oidc_provider_arn    = module.eks.oidc_provider_arn
+  namespace            = "keda"
+  service_account_name = "keda-operator"
   tags                 = local.common_tags
 }
