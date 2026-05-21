@@ -14,10 +14,11 @@ spec:
   maxReplicaCount: {{ .Values.autoscaling.maxReplicas }}
   triggers:
     - type: aws-sqs-queue
+      authenticationRef:
+        name: {{ include "analysis-worker.fullname" . }}
       metadata:
         awsRegion: {{ .Values.config.awsRegion | quote }}
         queueURL: {{ .Values.config.analysisQueueUrl | quote }}
         queueLength: {{ .Values.autoscaling.queueLength | quote }}
         activationQueueLength: {{ .Values.autoscaling.activationQueueLength | quote }}
-        identityOwner: pod
 {{- end }}
