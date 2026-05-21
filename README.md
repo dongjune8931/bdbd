@@ -195,11 +195,9 @@ Span detail에서는 `analysis-worker`의 outbound `HTTP POST`와 `score-service
 
 #### After: KEDA-driven Worker Scale-out
 
-<!-- TODO: after 구간 캡처를 아래에 추가 -->
-<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/12-analysis-queue-depth-after.png -->
-<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/13-analysis-worker-replicas-after.png -->
-<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/14-analysis-worker-cpu-after.png -->
-<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/15-analysis-job-duration-after.png -->
+<img width="1400" height="300" alt="스크린샷 2026-05-22 오전 3 22 11" src="https://github.com/user-attachments/assets/b5c8b72c-547f-4ffd-95e5-5fb9e19d98c0" />
+<img width="689" height="259" alt="스크린샷 2026-05-22 오전 3 20 34" src="https://github.com/user-attachments/assets/19e5c13f-3200-4841-ad4d-a17eabc0d6ae" />
+
 
 KEDA 설정을 수정한 뒤에는 `analysis-worker`가 queue depth를 external metric으로 정상 인식했고, `1 -> 12 replicas`까지 자동 확장됐다. 그 결과 `analysis-queue` backlog는 `~8,055` 수준에서 계속 감소하기 시작했고, worker CPU 사용량도 같은 시점에 함께 상승해 실제로 새 worker들이 작업을 처리하고 있음을 확인했다.
 
