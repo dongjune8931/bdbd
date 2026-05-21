@@ -484,6 +484,92 @@ data:
           ],
           "title": "Notification Results",
           "type": "barchart"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "showPoints": "never"
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 22
+          },
+          "id": 11,
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          },
+          "targets": [
+            {
+              "expr": "kube_deployment_status_replicas_ready{namespace=\"bodybuddy\", deployment=\"score-service\"}",
+              "legendFormat": "ready replicas",
+              "refId": "A"
+            }
+          ],
+          "title": "Score-service Ready Replicas",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "showPoints": "never"
+              },
+              "unit": "cores"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 22
+          },
+          "id": 12,
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"bodybuddy\", pod=~\"score-service-.*\", container!=\"\", container!=\"POD\"}[5m])) by (pod)",
+              "legendFormat": "{{pod}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Score-service CPU Usage",
+          "type": "timeseries"
         }
       ],
       "refresh": "30s",
@@ -503,5 +589,5 @@ data:
       },
       "timezone": "browser",
       "title": "BodyBuddy Service Overview",
-      "version": 1
+      "version": 2
     }
