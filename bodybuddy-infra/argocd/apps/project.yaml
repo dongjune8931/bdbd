@@ -7,6 +7,7 @@ spec:
   description: BodyBuddy application workloads
   sourceRepos:
     - https://github.com/dongjune8931/bdbd.git
+    - https://kedacore.github.io/charts
     - https://prometheus-community.github.io/helm-charts
     - https://kubecost.github.io/cost-analyzer/
     - https://kubernetes-sigs.github.io/metrics-server/
@@ -18,6 +19,8 @@ spec:
     - namespace: kubecost
       server: https://kubernetes.default.svc
     - namespace: kube-system
+      server: https://kubernetes.default.svc
+    - namespace: keda
       server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     - group: "*"

@@ -1,0 +1,23 @@
+{{- if .Values.autoscaling.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "analysis-worker.fullname" . }}
+  labels:
+    {{- include "analysis-worker.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    name: {{ include "analysis-worker.fullname" . }}
+  pollingInterval: {{ .Values.autoscaling.pollingInterval }}
+  cooldownPeriod: {{ .Values.autoscaling.cooldownPeriod }}
+  minReplicaCount: {{ .Values.autoscaling.minReplicas }}
+  maxReplicaCount: {{ .Values.autoscaling.maxReplicas }}
+  triggers:
+    - type: aws-sqs-queue
+      metadata:
+        awsRegion: {{ .Values.config.awsRegion | quote }}
+        queueURL: {{ .Values.config.analysisQueueUrl | quote }}
+        queueLength: {{ .Values.autoscaling.queueLength | quote }}
+        activationQueueLength: {{ .Values.autoscaling.activationQueueLength | quote }}
+        identityOwner: pod
+{{- end }}

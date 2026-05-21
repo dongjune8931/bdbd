@@ -1,24 +1,26 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: analysis-worker
+  name: keda
   namespace: bodybuddy-system
   labels:
     app.kubernetes.io/part-of: bodybuddy
-    app.kubernetes.io/component: worker
+    app.kubernetes.io/component: autoscaling
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
 spec:
   project: bodybuddy
   source:
-    repoURL: https://github.com/dongjune8931/bdbd.git
-    targetRevision: main
-    path: bodybuddy-app/deploy/helm/analysis-worker
+    repoURL: https://kedacore.github.io/charts
+    chart: keda
+    targetRevision: 2.16.1
   destination:
     server: https://kubernetes.default.svc
-    namespace: bodybuddy
+    namespace: keda
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - SkipDryRunOnMissingResource=true
+      - ServerSideApply=true

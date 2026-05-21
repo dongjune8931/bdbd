@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: 902371998304.dkr.ecr.ap-northeast-2.amazonaws.com/bodybuddy-dev-analysis-worker
-  tag: latest
+  tag: 9e8ff68
   pullPolicy: IfNotPresent
 
 serviceAccount:
@@ -31,6 +31,15 @@ resources:
     memory: 128Mi
   limits:
     memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 6
+  pollingInterval: 15
+  cooldownPeriod: 60
+  queueLength: 5
+  activationQueueLength: 1
 
 pdb:
   enabled: true
