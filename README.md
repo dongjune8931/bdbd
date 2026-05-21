@@ -238,6 +238,15 @@ KEDA 설정을 수정한 뒤에는 `analysis-worker`가 queue depth를 external 
 
 ---
 
+## 비용 최적화
+
+KubeCost로 클러스터 비용을 가시화하고, Karpenter consolidation으로 미사용 노드를 자동 정리해 절감 기회를 식별했다.
+
+<!-- kubecost savings 캡처 -->
+![]()
+
+---
+
 ## 기술 스택
 
 | 분류 | 기술 |
