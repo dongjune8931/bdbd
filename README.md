@@ -4,11 +4,11 @@
 
 ## 메인 아키텍처
 
-<img src="./bdbd_main_arc.drawio.png" width="700" />
+<img width="2629" height="2878" alt="bdbd_main_arc drawio" src="https://github.com/user-attachments/assets/a2df3c22-5fbf-450a-89cf-57dc076f994c" />
 
 ### 인바디 업로드 비동기 처리 흐름
 
-<img src="./inbody_upload_diagram.png" width="700" />
+<img width="1072" height="747" alt="inbody_upload_diagram" src="https://github.com/user-attachments/assets/907cc93f-2cad-4ffd-a95f-e468da904ad0" />
 
 ### 서비스 흐름
 
@@ -119,7 +119,7 @@ all in-flight messages processed
 
 ### S3 백업 / 복구
 
-<img src="./s3_dr.png" width="700" />
+<img width="669" height="481" alt="s3_dr" src="https://github.com/user-attachments/assets/78a00d1f-4112-4805-9ec8-ffc4f5cf437c" />
 
 S3 객체 삭제 이벤트는 EventBridge와 Lambda로 연결하고, 최신 delete marker를 제거해 이전 버전을 다시 현재 버전으로 복원한다. 복구 결과는 SES 메일과 Grafana 대시보드로 함께 남겨 운영자가 삭제 감지 시점의 상태와 복구 성공 여부를 바로 확인할 수 있게 했다.
 
