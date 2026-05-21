@@ -23,6 +23,7 @@ import (
 	"github.com/bodybuddy/app/internal/observability"
 	"github.com/bodybuddy/app/internal/queue"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.opentelemetry.io/otel"
 )
 
 func main() {
@@ -52,6 +53,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer dbPool.Close()
+	observability.RegisterScoreDBPoolMetrics(reg, cfg.ServiceName, dbPool.Pool)
 
 	redisClient := cache.New(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisTLSEnabled)
 	defer redisClient.Close()
@@ -129,6 +131,7 @@ func main() {
 // getRankingHandler returns top-N ranking from Redis sorted set.
 func getRankingHandler(rdb *redis.Client, metrics *observability.Metrics) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		tracer := otel.Tracer("score-service")
 		start := time.Now()
 		limitStr := c.DefaultQuery("limit", "10")
 		limit, err := strconv.ParseInt(limitStr, 10, 64)
@@ -136,11 +139,21 @@ func getRankingHandler(rdb *redis.Client, metrics *observability.Metrics) gin.Ha
 			limit = 10
 		}
 
-		ranking, err := domain.GetTopRanking(c.Request.Context(), rdb, limit)
+		redisStart := time.Now()
+		lookupCtx, lookupSpan := tracer.Start(c.Request.Context(), "score-service.rankingLookup")
+		ranking, err := domain.GetTopRanking(lookupCtx, rdb, limit)
+		lookupSpan.End()
+		metrics.ScoreRedisReadDuration.Observe(time.Since(redisStart).Seconds())
 		if err != nil {
+			metrics.ScoreRankingCacheLookupsTotal.WithLabelValues("error").Inc()
 			slog.Error("failed to get ranking", "error", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
 			return
+		}
+		if len(ranking) == 0 {
+			metrics.ScoreRankingCacheLookupsTotal.WithLabelValues("miss").Inc()
+		} else {
+			metrics.ScoreRankingCacheLookupsTotal.WithLabelValues("hit").Inc()
 		}
 		metrics.RankingReadDuration.Observe(time.Since(start).Seconds())
 
@@ -180,6 +193,7 @@ type updateScoreRequest struct {
 // updateScoreHandler is called by analysis-worker after Mock OCR processing.
 func updateScoreHandler(cfg *config.ScoreService, pool *db.Pool, rdb *redis.Client, sqsClient *queue.Client, metrics *observability.Metrics) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		tracer := otel.Tracer("score-service")
 		var req updateScoreRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -193,7 +207,11 @@ func updateScoreHandler(cfg *config.ScoreService, pool *db.Pool, rdb *redis.Clie
 			Breakdown: req.ScoreBreakdown,
 		}
 
-		inserted, err := domain.UpdateScore(c.Request.Context(), pool.Pool, rdb, entry)
+		dbStart := time.Now()
+		updateCtx, updateSpan := tracer.Start(c.Request.Context(), "score-service.persistScore")
+		inserted, err := domain.UpdateScore(updateCtx, pool.Pool, rdb, entry)
+		updateSpan.End()
+		metrics.ScoreDBOperationDuration.WithLabelValues("update_score").Observe(time.Since(dbStart).Seconds())
 		if err != nil {
 			slog.Error("failed to update score", "user_id", req.UserID, "error", err)
 			metrics.ScoreUpdatesTotal.WithLabelValues("error").Inc()
@@ -209,7 +227,12 @@ func updateScoreHandler(cfg *config.ScoreService, pool *db.Pool, rdb *redis.Clie
 				`{"user_id":%q,"upload_id":%q,"score":%d}`,
 				req.UserID, req.UploadID, req.Score,
 			)
-			if _, err := sqsClient.SendMessage(c.Request.Context(), cfg.NotificationQueueURL, notifMsg, nil); err != nil {
+			enqueueStart := time.Now()
+			enqueueCtx, enqueueSpan := tracer.Start(c.Request.Context(), "score-service.enqueueNotification")
+			_, err := sqsClient.SendMessage(enqueueCtx, cfg.NotificationQueueURL, notifMsg, nil)
+			enqueueSpan.End()
+			metrics.ScoreNotificationEnqueueDuration.Observe(time.Since(enqueueStart).Seconds())
+			if err != nil {
 				slog.Warn("failed to publish notification event", "user_id", req.UserID, "error", err)
 			}
 		}

@@ -571,6 +571,192 @@ data:
           "title": "Score-service CPU Usage",
           "type": "timeseries"
         }
+        ,
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "showPoints": "never"
+              },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 30
+          },
+          "id": 13,
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(bodybuddy_score_redis_read_duration_seconds_bucket[5m])) by (le))",
+              "legendFormat": "p95",
+              "refId": "A"
+            },
+            {
+              "expr": "sum(rate(bodybuddy_score_redis_read_duration_seconds_sum[5m])) / sum(rate(bodybuddy_score_redis_read_duration_seconds_count[5m]))",
+              "legendFormat": "avg",
+              "refId": "B"
+            }
+          ],
+          "title": "Score-service Redis Read Duration",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 30
+          },
+          "id": 14,
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum by (result) (bodybuddy_score_ranking_cache_lookups_total)",
+              "legendFormat": "{{result}}",
+              "refId": "A"
+            }
+          ],
+          "title": "Ranking Cache Lookup Results",
+          "type": "barchart"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "showPoints": "never"
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 38
+          },
+          "id": 15,
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          },
+          "targets": [
+            {
+              "expr": "bodybuddy_score_db_pool_acquired_connections",
+              "legendFormat": "acquired",
+              "refId": "A"
+            },
+            {
+              "expr": "bodybuddy_score_db_pool_idle_connections",
+              "legendFormat": "idle",
+              "refId": "B"
+            },
+            {
+              "expr": "bodybuddy_score_db_pool_total_connections",
+              "legendFormat": "total",
+              "refId": "C"
+            }
+          ],
+          "title": "Score-service DB Pool Connections",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "showPoints": "never"
+              },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 38
+          },
+          "id": 16,
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(bodybuddy_score_db_pool_acquire_duration_seconds_total[5m])",
+              "legendFormat": "acquire wait / sec",
+              "refId": "A"
+            },
+            {
+              "expr": "rate(bodybuddy_score_db_pool_empty_acquire_total[5m])",
+              "legendFormat": "empty acquires / sec",
+              "refId": "B"
+            }
+          ],
+          "title": "Score-service DB Pool Pressure",
+          "type": "timeseries"
+        }
       ],
       "refresh": "30s",
       "schemaVersion": 39,
@@ -589,5 +775,5 @@ data:
       },
       "timezone": "browser",
       "title": "BodyBuddy Service Overview",
-      "version": 2
+      "version": 3
     }

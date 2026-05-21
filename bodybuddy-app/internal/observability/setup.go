@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -19,16 +20,21 @@ import (
 
 // Metrics holds common Prometheus metrics for all services.
 type Metrics struct {
-	HTTPRequestsTotal     *prometheus.CounterVec
-	HTTPRequestDuration   *prometheus.HistogramVec
-	SQSMessagesProcessed  *prometheus.CounterVec
-	SQSMessageDuration    *prometheus.HistogramVec
-	UploadRequestsTotal   *prometheus.CounterVec
-	AnalysisJobsProcessed *prometheus.CounterVec
-	AnalysisJobDuration   prometheus.Histogram
-	ScoreUpdatesTotal     *prometheus.CounterVec
-	NotificationSentTotal *prometheus.CounterVec
-	RankingReadDuration   prometheus.Histogram
+	HTTPRequestsTotal                *prometheus.CounterVec
+	HTTPRequestDuration              *prometheus.HistogramVec
+	SQSMessagesProcessed             *prometheus.CounterVec
+	SQSMessageDuration               *prometheus.HistogramVec
+	UploadRequestsTotal              *prometheus.CounterVec
+	AnalysisJobsProcessed            *prometheus.CounterVec
+	AnalysisJobDuration              prometheus.Histogram
+	ScoreUpdatesTotal                *prometheus.CounterVec
+	NotificationSentTotal            *prometheus.CounterVec
+	RankingReadDuration              prometheus.Histogram
+	ScoreDBOperationDuration         *prometheus.HistogramVec
+	ScoreRedisReadDuration           prometheus.Histogram
+	ScoreRedisWriteDuration          prometheus.Histogram
+	ScoreNotificationEnqueueDuration prometheus.Histogram
+	ScoreRankingCacheLookupsTotal    *prometheus.CounterVec
 }
 
 // NewMetrics registers and returns common metrics.
@@ -130,6 +136,57 @@ func NewMetrics(serviceName string, reg *prometheus.Registry) *Metrics {
 				Buckets:     []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1},
 			},
 		),
+		ScoreDBOperationDuration: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Namespace:   "bodybuddy",
+				Subsystem:   "score",
+				Name:        "db_operation_duration_seconds",
+				Help:        "Latency of score-service database operations.",
+				ConstLabels: prometheus.Labels{"service": serviceName},
+				Buckets:     []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2},
+			},
+			[]string{"operation"},
+		),
+		ScoreRedisReadDuration: prometheus.NewHistogram(
+			prometheus.HistogramOpts{
+				Namespace:   "bodybuddy",
+				Subsystem:   "score",
+				Name:        "redis_read_duration_seconds",
+				Help:        "Latency of Redis reads performed by score-service.",
+				ConstLabels: prometheus.Labels{"service": serviceName},
+				Buckets:     []float64{0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1},
+			},
+		),
+		ScoreRedisWriteDuration: prometheus.NewHistogram(
+			prometheus.HistogramOpts{
+				Namespace:   "bodybuddy",
+				Subsystem:   "score",
+				Name:        "redis_write_duration_seconds",
+				Help:        "Latency of Redis writes performed by score-service.",
+				ConstLabels: prometheus.Labels{"service": serviceName},
+				Buckets:     []float64{0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1},
+			},
+		),
+		ScoreNotificationEnqueueDuration: prometheus.NewHistogram(
+			prometheus.HistogramOpts{
+				Namespace:   "bodybuddy",
+				Subsystem:   "score",
+				Name:        "notification_enqueue_duration_seconds",
+				Help:        "Latency of notification queue enqueues from score-service.",
+				ConstLabels: prometheus.Labels{"service": serviceName},
+				Buckets:     []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1},
+			},
+		),
+		ScoreRankingCacheLookupsTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace:   "bodybuddy",
+				Subsystem:   "score",
+				Name:        "ranking_cache_lookups_total",
+				Help:        "Total number of score-service ranking cache lookups by result.",
+				ConstLabels: prometheus.Labels{"service": serviceName},
+			},
+			[]string{"result"},
+		),
 	}
 
 	reg.MustRegister(
@@ -145,6 +202,11 @@ func NewMetrics(serviceName string, reg *prometheus.Registry) *Metrics {
 		m.ScoreUpdatesTotal,
 		m.NotificationSentTotal,
 		m.RankingReadDuration,
+		m.ScoreDBOperationDuration,
+		m.ScoreRedisReadDuration,
+		m.ScoreRedisWriteDuration,
+		m.ScoreNotificationEnqueueDuration,
+		m.ScoreRankingCacheLookupsTotal,
 	)
 
 	return m
@@ -153,6 +215,99 @@ func NewMetrics(serviceName string, reg *prometheus.Registry) *Metrics {
 // NewRegistry creates a new Prometheus registry and registers standard metrics.
 func NewRegistry() *prometheus.Registry {
 	return prometheus.NewRegistry()
+}
+
+// RegisterScoreDBPoolMetrics exports pgxpool runtime stats so load tests can
+// distinguish CPU saturation from connection-pool saturation.
+func RegisterScoreDBPoolMetrics(reg *prometheus.Registry, serviceName string, pool *pgxpool.Pool) {
+	commonLabels := prometheus.Labels{"service": serviceName}
+
+	reg.MustRegister(
+		prometheus.NewGaugeFunc(
+			prometheus.GaugeOpts{
+				Namespace:   "bodybuddy",
+				Subsystem:   "score",
+				Name:        "db_pool_acquired_connections",
+				Help:        "Number of database connections currently acquired from the score-service pgx pool.",
+				ConstLabels: commonLabels,
+			},
+			func() float64 {
+				return float64(pool.Stat().AcquiredConns())
+			},
+		),
+		prometheus.NewGaugeFunc(
+			prometheus.GaugeOpts{
+				Namespace:   "bodybuddy",
+				Subsystem:   "score",
+				Name:        "db_pool_idle_connections",
+				Help:        "Number of idle database connections in the score-service pgx pool.",
+				ConstLabels: commonLabels,
+			},
+			func() float64 {
+				return float64(pool.Stat().IdleConns())
+			},
+		),
+		prometheus.NewGaugeFunc(
+			prometheus.GaugeOpts{
+				Namespace:   "bodybuddy",
+				Subsystem:   "score",
+				Name:        "db_pool_total_connections",
+				Help:        "Total number of database connections managed by the score-service pgx pool.",
+				ConstLabels: commonLabels,
+			},
+			func() float64 {
+				return float64(pool.Stat().TotalConns())
+			},
+		),
+		prometheus.NewGaugeFunc(
+			prometheus.GaugeOpts{
+				Namespace:   "bodybuddy",
+				Subsystem:   "score",
+				Name:        "db_pool_max_connections",
+				Help:        "Configured max connection count of the score-service pgx pool.",
+				ConstLabels: commonLabels,
+			},
+			func() float64 {
+				return float64(pool.Stat().MaxConns())
+			},
+		),
+		prometheus.NewCounterFunc(
+			prometheus.CounterOpts{
+				Namespace:   "bodybuddy",
+				Subsystem:   "score",
+				Name:        "db_pool_acquire_total",
+				Help:        "Cumulative number of database connection acquires in the score-service pgx pool.",
+				ConstLabels: commonLabels,
+			},
+			func() float64 {
+				return float64(pool.Stat().AcquireCount())
+			},
+		),
+		prometheus.NewCounterFunc(
+			prometheus.CounterOpts{
+				Namespace:   "bodybuddy",
+				Subsystem:   "score",
+				Name:        "db_pool_empty_acquire_total",
+				Help:        "Cumulative number of empty acquires in the score-service pgx pool (had to wait for a free connection).",
+				ConstLabels: commonLabels,
+			},
+			func() float64 {
+				return float64(pool.Stat().EmptyAcquireCount())
+			},
+		),
+		prometheus.NewCounterFunc(
+			prometheus.CounterOpts{
+				Namespace:   "bodybuddy",
+				Subsystem:   "score",
+				Name:        "db_pool_acquire_duration_seconds_total",
+				Help:        "Cumulative time spent waiting for database connections in the score-service pgx pool.",
+				ConstLabels: commonLabels,
+			},
+			func() float64 {
+				return pool.Stat().AcquireDuration().Seconds()
+			},
+		),
+	)
 }
 
 // InitTracer sets up the global OpenTelemetry tracer with an OTLP gRPC exporter.
