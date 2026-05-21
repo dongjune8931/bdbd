@@ -26,6 +26,7 @@ bodybuddy-app/.gocache/
 
 # Temporary working files
 tmp/
+.tmp/
 
 # Internal docs not for public view
 AGENTS.md
