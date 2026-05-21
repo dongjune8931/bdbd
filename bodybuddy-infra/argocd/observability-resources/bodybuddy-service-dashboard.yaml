@@ -756,6 +756,150 @@ data:
           ],
           "title": "Score-service DB Pool Pressure",
           "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "cloudwatch",
+            "uid": "bodybuddy-cloudwatch"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "showPoints": "never"
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 0,
+            "y": 46
+          },
+          "id": 17,
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "cloudwatch",
+                "uid": "bodybuddy-cloudwatch"
+              },
+              "dimensions": {
+                "QueueName": "bodybuddy-dev-analysis-queue"
+              },
+              "metricName": "ApproximateNumberOfMessagesVisible",
+              "namespace": "AWS/SQS",
+              "metricEditorMode": 0,
+              "metricQueryType": 0,
+              "matchExact": true,
+              "queryMode": "Metrics",
+              "refId": "A",
+              "region": "ap-northeast-2",
+              "statistic": "Maximum",
+              "period": "60"
+            }
+          ],
+          "title": "Analysis Queue Depth",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "showPoints": "never"
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 46
+          },
+          "id": 18,
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          },
+          "targets": [
+            {
+              "expr": "kube_deployment_status_replicas_ready{namespace=\"bodybuddy\",deployment=\"analysis-worker\"}",
+              "legendFormat": "ready replicas",
+              "refId": "A"
+            }
+          ],
+          "title": "Analysis-worker Ready Replicas",
+          "type": "timeseries"
+        },
+        {
+          "datasource": "Prometheus",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "linear",
+                "lineWidth": 2,
+                "showPoints": "never"
+              },
+              "unit": "cores"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 46
+          },
+          "id": 19,
+          "options": {
+            "legend": {
+              "displayMode": "table",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          },
+          "targets": [
+            {
+              "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"bodybuddy\",pod=~\"analysis-worker-.*\",container!=\"\",container!=\"POD\"}[5m]))",
+              "legendFormat": "analysis-worker cpu",
+              "refId": "A"
+            }
+          ],
+          "title": "Analysis-worker CPU Usage",
+          "type": "timeseries"
         }
       ],
       "refresh": "30s",
@@ -775,5 +919,5 @@ data:
       },
       "timezone": "browser",
       "title": "BodyBuddy Service Overview",
-      "version": 3
+      "version": 4
     }
