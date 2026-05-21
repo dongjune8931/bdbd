@@ -26,3 +26,10 @@ bodybuddy-app/.gocache/
 
 # Temporary working files
 tmp/
+
+# Internal docs not for public view
+AGENTS.md
+terraform-portfolio.md
+
+# Evidence/report PNG files
+bodybuddy-infra/reports/evidence/**/*.png
