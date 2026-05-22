@@ -52,7 +52,7 @@ Runtime placement:
 | 비동기 처리 | `user-service -> SQS -> analysis-worker -> score-service` 흐름 | 업로드 후 score 반영, worker 로그 |
 | Spot 운영 | API는 on-demand, worker는 Spot 노드로 분리 | Spot 노드 drain, re-queue, 새 worker 재처리 |
 | DR | S3 자동 복구, RDS PITR, 복구 런북 | Lambda 로그, RDS restore, RTO/RPO 매트릭스 |
-| 부하 테스트 | k6 기반 upload/ranking 측정과 HPA 튜닝 | `p95 417.59ms -> 35.65ms`, `1 -> 4 replicas` |
+| 관측성 / 오토스케일링 | OTel trace, Grafana, KEDA/HPA 기반 병목 관찰 | queue backlog `8,816`, worker `1 -> 12 replicas`, trace/메트릭 캡처 |
 
 ---
 
@@ -192,30 +192,13 @@ Span detail에서는 `analysis-worker`의 outbound `HTTP POST`와 `score-service
 
 ### Async Backlog Bottleneck and Recovery
 
-랭킹 조회 path는 Redis hit 비율이 높아 `N=300~1000` 구간에서도 비교적 안정적으로 버텼다. 대신 더 의미 있는 병목은 비동기 분석 파이프라인에서 드러났다. 업로드 burst 동안 `user-service`는 빠르게 요청을 받아들이지만, `analysis-worker`가 1개일 때는 메시지 처리량이 따라가지 못해 queue backlog가 빠르게 증가했다.
-
-이 병목은 `SQS queue depth`, `analysis-worker replica`, `CPU usage`, `job duration`을 함께 관측해 확인했고, 이후 KEDA가 queue depth를 기준으로 worker를 최대 12개까지 자동 확장하도록 수정해 backlog가 실제로 감소하기 시작하는 것을 검증했다.
-
-#### Before: Single Worker Bottleneck
-
-<!-- TODO: before 구간 캡처를 아래에 추가 -->
-<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/10-analysis-queue-depth-before.png -->
-<!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/11-analysis-worker-replicas-before.png -->
-
-업로드 burst(`2026-05-22 01:50:44 ~ 01:53:44 KST`) 동안 `user-service`는 약 8,900건의 업로드 요청을 정상 수락했고 `p95 30.35ms`, `error 0%`를 유지했다. 하지만 같은 시점의 `analysis-worker`는 단일 replica로 고정되어 있었고, 그 결과 `analysis-queue` backlog가 `8,816`건까지 누적됐다.
-
-- Upload accepted: `8,900`
-- API p95: `30.35ms`
-- Queue backlog: `8,816`
-- Worker replicas: `1`
-
-#### After: KEDA-driven Worker Scale-out
-
 <img width="1400" height="300" alt="스크린샷 2026-05-22 오전 3 22 11" src="https://github.com/user-attachments/assets/b5c8b72c-547f-4ffd-95e5-5fb9e19d98c0" />
 <img width="689" height="259" alt="스크린샷 2026-05-22 오전 3 20 34" src="https://github.com/user-attachments/assets/19e5c13f-3200-4841-ad4d-a17eabc0d6ae" />
 
 
-KEDA 설정을 수정한 뒤에는 `analysis-worker`가 queue depth를 external metric으로 정상 인식했고, `1 -> 12 replicas`까지 자동 확장됐다. 그 결과 `analysis-queue` backlog는 `~8,055` 수준에서 계속 감소하기 시작했고, worker CPU 사용량도 같은 시점에 함께 상승해 실제로 새 worker들이 작업을 처리하고 있음을 확인했다.
+업로드 burst(`2026-05-22 01:50:44 ~ 01:53:44 KST`) 동안 `user-service`는 약 8,900건의 업로드 요청을 정상 수락했고 `p95 30.35ms`, `error 0%`를 유지했다. 하지만 같은 시점의 `analysis-worker`는 단일 replica로 고정되어 있었고, 그 결과 `analysis-queue` backlog가 `8,816`건까지 누적됐다.
+
+이후 KEDA 설정을 수정한 뒤에는 `analysis-worker`가 queue depth를 external metric으로 정상 인식했고, `1 -> 12 replicas`까지 자동 확장됐다. 그 결과 `analysis-queue` backlog는 `~8,055` 수준에서 계속 감소하기 시작했고, worker CPU 사용량도 같은 시점에 함께 상승해 실제로 새 worker들이 작업을 처리하고 있음을 확인했다.
 
 - Queue depth observed: `~8,055` and decreasing
 - Worker replicas: `1 -> 12`
