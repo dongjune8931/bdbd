@@ -11,26 +11,7 @@
 <img width="1072" height="747" alt="inbody_upload_diagram" src="https://github.com/user-attachments/assets/907cc93f-2cad-4ffd-a95f-e468da904ad0" />
 
 ### 서비스 흐름
-
-```text
-Client
-  |
-  | POST /api/v1/uploads
-  v
-user-service
-  |
-  | SQS message
-  v
-analysis-worker
-  |
-  | POST /internal/v1/score
-  v
-score-service
-  |
-  | notification event
-  v
-notification-worker
-```
+<img width="1472" height="237" alt="스크린샷 2026-05-22 오후 5 45 22" src="https://github.com/user-attachments/assets/559b4e39-1efa-4e01-b654-73b9eb94607c" />
 
 Runtime placement:
 
@@ -67,45 +48,9 @@ Runtime placement:
 | S3 객체 삭제 | Versioning + Object Lock + EventBridge + Lambda | 최신 delete marker 제거, 이전 버전 자동 복원, 메일/대시보드 기록 |
 
 ### Spot 중단 시 Worker 재처리 흐름
+<img width="1396" height="211" alt="스크린샷 2026-05-22 오후 5 46 39" src="https://github.com/user-attachments/assets/7109041e-c5fe-4e63-b383-eded13375945" />
 
-```text
-                    Spot Node
-                       │
-          ┌────────────┴────────────┐
-          │      analysis-worker    │
-          │   · polls SQS           │
-          │   · processes message   │
-          └────────────┬────────────┘
-                       │
-              Interruption notice
-              (node drain / SIGTERM)
-                       │
-          ┌────────────┴────────────┐
-          │    Graceful shutdown    │
-          │  · stop polling         │
-          │  · finish in-flight     │
-          │  · NO DeleteMessage     │
-          └────────────┬────────────┘
-                       │
-            visibility timeout expires
-                       │
-          ┌────────────┴────────────┐
-          │   Message reappears     │
-          │   in analysis-queue     │
-          └────────────┬────────────┘
-                       │
-          ┌────────────┴────────────┐
-          │      New worker         │
-          │ rescheduled by Karpenter│
-          │   on another node       │
-          └────────────┬────────────┘
-                       │
-          ┌────────────┴────────────┐
-          │      score-service      │
-          │  · idempotent update    │
-          │  · upload_id dedup      │
-          └─────────────────────────┘
-```
+
 
 Batch worker는 Spot 노드에서 실행하지만, SQS visibility timeout과 멱등성 처리로 interruption 이후에도 메시지 유실 없이 안전하게 재처리할 수 있도록 설계했다.
 
