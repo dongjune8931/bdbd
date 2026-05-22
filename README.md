@@ -33,7 +33,7 @@ Runtime placement:
 | 비동기 처리 | `user-service -> SQS -> analysis-worker -> score-service` 흐름 | 업로드 후 score 반영, worker 로그 |
 | Spot 운영 | API는 on-demand, worker는 Spot 노드로 분리 | Spot 노드 drain, re-queue, 새 worker 재처리 |
 | DR | S3 자동 복구, RDS PITR, 복구 런북 | Lambda 로그, RDS restore, RTO/RPO 매트릭스 |
-| 관측성 / 오토스케일링 | OTel trace, Grafana, KEDA/HPA 기반 병목 관찰 | queue backlog `8,816`, worker `1 -> 12 replicas`, trace/메트릭 캡처 |
+| 부하 테스트 / 오토스케일링 | OTel trace, Grafana, KEDA/HPA 기반 병목 관찰 | queue backlog `8,816`, worker `1 -> 12 replicas`, trace/메트릭 캡처 |
 
 ---
 
@@ -135,7 +135,7 @@ Span detail에서는 `analysis-worker`의 outbound `HTTP POST`와 `score-service
 
 즉 병목은 개별 job latency가 아니라 **worker capacity 부족**이었고, 해결은 **KEDA 기반 SQS autoscaling**이었다. 랭킹 조회 부하는 별도 관측 실험으로 유지했고, 해당 경로는 Redis hit 비율이 높아 `N=300~1000` 구간에서도 비교적 안정적으로 동작했다.
 
-### Async Backlog Bottleneck and Recovery
+### Case Study: Async Backlog Bottleneck
 
 <img width="1400" height="300" alt="스크린샷 2026-05-22 오전 3 22 11" src="https://github.com/user-attachments/assets/b5c8b72c-547f-4ffd-95e5-5fb9e19d98c0" />
 <img width="689" height="259" alt="스크린샷 2026-05-22 오전 3 20 34" src="https://github.com/user-attachments/assets/19e5c13f-3200-4841-ad4d-a17eabc0d6ae" />
@@ -163,6 +163,33 @@ Span detail에서는 `analysis-worker`의 outbound `HTTP POST`와 `score-service
 <!-- 권장 파일: bodybuddy-infra/reports/evidence/05-observability/19-score-service-ranking-trace.png -->
 
 이 섹션은 “부하가 올라가면 지표가 어떻게 반응하는가”를 보여주는 근거로 사용하고, 실제 병목 발견 + 해결 스토리는 위의 `analysis-worker` backlog 사례에 집중한다.
+
+---
+
+## IaC and Platform Design
+
+BodyBuddy의 인프라는 "Terraform이 AWS 리소스를 만든다" 수준이 아니라, **리소스 책임 경계와 운영 주체를 코드로 분리하는 것**에 초점을 맞췄다. Terraform은 VPC, EKS, 데이터스토어, SQS, IAM/IRSA, DR Lambda 같은 클라우드 리소스를 관리하고, ArgoCD는 Helm chart와 add-on을 통해 클러스터 내부 workloads의 desired state를 관리한다.
+
+핵심 설계 포인트:
+
+- **책임 분리**
+  - Terraform: AWS 리소스, IAM, 네트워크, 데이터스토어
+  - ArgoCD: 서비스 배포, observability, add-ons
+- **트래픽 특성 기반 배치**
+  - API는 `critical-pool / on-demand`
+  - worker는 `batch-pool / spot`
+- **최소 권한**
+  - 서비스별 IRSA role 분리
+  - `analysis-worker`, `score-service`, `keda-operator` 권한을 별도로 관리
+- **운영성과 비용**
+  - S3 Gateway Endpoint, Spot node pool, destroy/recreate 가능한 dev 구조
+- **복구 가능성**
+  - SQS 재처리, ArgoCD self-heal, S3 자동 복구, RDS PITR을 IaC 범위에 포함
+
+더 자세한 설계 근거와 모듈 구조는 아래 리포트에 정리했다.
+
+- [IaC and Platform Design Report](./bodybuddy-infra/reports/iac-platform-design.md)
+- [Infrastructure README](./bodybuddy-infra/README.md)
 
 
 ---
