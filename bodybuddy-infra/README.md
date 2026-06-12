@@ -11,7 +11,8 @@ This repository area is the operational side of BodyBuddy. It describes how the 
 | Terraform | VPC, EKS, Karpenter, RDS, ElastiCache, S3, SQS, ECR, IAM/IRSA |
 | GitOps | ArgoCD App-of-Apps, service applications, observability, cost tooling |
 | Recovery | RDS PITR, S3 object recovery, GitOps cluster recovery |
-| Reports | RTO/RPO matrix, Spot interruption drill, load-test results |
+| Chaos drills | One-off LitmusChaos dev drills for measured resilience evidence |
+| Reports | RTO/RPO matrix, Spot interruption drill, load-test results, chaos drill results |
 
 ## Directory Map
 
@@ -25,14 +26,19 @@ argocd/
   apps/                 # child applications and AppProject
   karpenter/            # NodePool and EC2NodeClass manifests
 
+chaos/
+  litmus/               # one-off LitmusChaos dev drill manifests
+
 runbooks/
   destroy-reapply-recovery.md
   gitops-cluster-recovery.md
+  litmuschaos-dev-drill.md
   rds-pitr-restore.md
   s3-mass-delete-recovery.md
 
 reports/
   README.md
+  09-litmuschaos-dev-drill.md
   rto-rpo-matrix.md
   load-test-report.md
   evidence/
@@ -42,6 +48,7 @@ reports/
 
 - [RTO / RPO Matrix](./reports/rto-rpo-matrix.md)
 - [Load Test Report](./reports/load-test-report.md)
+- [LitmusChaos Dev Drill Report](./reports/09-litmuschaos-dev-drill.md)
 - [Reports Index](./reports/README.md)
 
 Detailed drill reports and raw screenshots live under `reports/` and `reports/evidence/`.
@@ -49,6 +56,7 @@ Detailed drill reports and raw screenshots live under `reports/` and `reports/ev
 ## Runbooks
 
 - [Destroy / Reapply Recovery](./runbooks/destroy-reapply-recovery.md)
+- [LitmusChaos Dev Drill](./runbooks/litmuschaos-dev-drill.md)
 - [RDS PITR Restore](./runbooks/rds-pitr-restore.md)
 - [S3 Mass Delete Recovery](./runbooks/s3-mass-delete-recovery.md)
 - [GitOps Cluster Recovery](./runbooks/gitops-cluster-recovery.md)
