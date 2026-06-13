@@ -8,13 +8,13 @@ spec:
     - alias: al2023@latest
   role: bodybuddy-dev-eks-karpenter-node
   subnetSelectorTerms:
-    - id: subnet-009e7c2248b36cd74
-    - id: subnet-031c3d0b18f983ffe
+    - id: subnet-098bb41208e1d082f
+    - id: subnet-085ff253cf8de3dae
   securityGroupSelectorTerms:
     - tags:
         karpenter.sh/discovery: bodybuddy-dev-eks
   tags:
-    Project: bodybuddy
     Environment: dev
     ManagedBy: argocd
+    Project: bodybuddy
     karpenter.sh/discovery: bodybuddy-dev-eks
