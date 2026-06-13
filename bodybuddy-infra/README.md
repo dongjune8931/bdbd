@@ -82,6 +82,37 @@ AWS_PROFILE=terraform-bodybuddy \
 bodybuddy-infra/scripts/refresh-dev-values.sh
 ```
 
+## Dev Automation
+
+For an already running dev cluster, run a fresh upload smoke test:
+
+```bash
+AWS_PROFILE=terraform-bodybuddy \
+bodybuddy-infra/scripts/dev-smoke.sh
+```
+
+For a direct dev redeploy, value refresh, migration check, and smoke test:
+
+```bash
+AWS_PROFILE=terraform-bodybuddy \
+bodybuddy-infra/scripts/dev-up.sh
+```
+
+Useful switches:
+
+```bash
+# Recreate AWS resources too. This can take 15-20 minutes for EKS.
+RUN_TERRAFORM=1 AWS_PROFILE=terraform-bodybuddy bodybuddy-infra/scripts/dev-up.sh
+
+# Build and push fresh service images before redeploying.
+BUILD_IMAGES=1 AWS_PROFILE=terraform-bodybuddy bodybuddy-infra/scripts/dev-up.sh
+
+# Only make sure the schema exists, then clean up the migration Job.
+AWS_PROFILE=terraform-bodybuddy bodybuddy-infra/scripts/dev-migrate.sh
+```
+
+`dev-up.sh` intentionally suspends ArgoCD auto-sync during direct dev deploys so local rendered Helm values are not immediately reverted by GitOps. Do not commit refreshed Helm values unless the runtime values are intentionally being promoted to Git.
+
 ## Verification
 
 ```bash
