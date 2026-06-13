@@ -107,7 +107,7 @@ token="$(jq -r '.token // empty' <<<"$auth_response")"
 user_id="$(jq -r '.user_id // empty' <<<"$auth_response")"
 
 if [[ -z "$token" || -z "$user_id" ]]; then
-  echo "registration response did not include token/user_id: $register_response" >&2
+  echo "authentication response did not include token/user_id: $auth_response" >&2
   exit 1
 fi
 

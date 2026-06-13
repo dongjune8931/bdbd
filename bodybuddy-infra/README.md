@@ -91,7 +91,7 @@ AWS_PROFILE=terraform-bodybuddy \
 bodybuddy-infra/scripts/dev-smoke.sh
 ```
 
-For a direct dev redeploy, value refresh, migration check, and smoke test:
+For a safe refresh of kubeconfig, Terraform-derived values, and Karpenter manifests:
 
 ```bash
 AWS_PROFILE=terraform-bodybuddy \
@@ -107,11 +107,14 @@ RUN_TERRAFORM=1 AWS_PROFILE=terraform-bodybuddy bodybuddy-infra/scripts/dev-up.s
 # Build and push fresh service images before redeploying.
 BUILD_IMAGES=1 AWS_PROFILE=terraform-bodybuddy bodybuddy-infra/scripts/dev-up.sh
 
+# Opt in to a direct kubectl-based redeploy, migration, and smoke test.
+DIRECT_DEPLOY=1 AWS_PROFILE=terraform-bodybuddy bodybuddy-infra/scripts/dev-up.sh
+
 # Only make sure the schema exists, then clean up the migration Job.
 AWS_PROFILE=terraform-bodybuddy bodybuddy-infra/scripts/dev-migrate.sh
 ```
 
-`dev-up.sh` intentionally suspends ArgoCD auto-sync during direct dev deploys so local rendered Helm values are not immediately reverted by GitOps. Do not commit refreshed Helm values unless the runtime values are intentionally being promoted to Git.
+`dev-up.sh` now defaults to a GitOps-safe refresh flow. Direct `kubectl apply` deployment and ArgoCD auto-sync suspension are opt-in through `DIRECT_DEPLOY=1`, because they can intentionally leave applications `OutOfSync` during local-only troubleshooting.
 
 ## Verification
 

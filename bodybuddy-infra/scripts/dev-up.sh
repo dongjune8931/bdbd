@@ -15,10 +15,11 @@ ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-bodybuddy-system}"
 RUN_TERRAFORM="${RUN_TERRAFORM:-0}"
 RUN_BOOTSTRAP="${RUN_BOOTSTRAP:-$RUN_TERRAFORM}"
 BUILD_IMAGES="${BUILD_IMAGES:-0}"
-DEPLOY_SERVICES="${DEPLOY_SERVICES:-1}"
-RUN_MIGRATION="${RUN_MIGRATION:-1}"
-RUN_SMOKE="${RUN_SMOKE:-1}"
-SUSPEND_ARGOCD_SYNC="${SUSPEND_ARGOCD_SYNC:-1}"
+DIRECT_DEPLOY="${DIRECT_DEPLOY:-0}"
+DEPLOY_SERVICES="${DEPLOY_SERVICES:-$DIRECT_DEPLOY}"
+RUN_MIGRATION="${RUN_MIGRATION:-$DIRECT_DEPLOY}"
+RUN_SMOKE="${RUN_SMOKE:-$DIRECT_DEPLOY}"
+SUSPEND_ARGOCD_SYNC="${SUSPEND_ARGOCD_SYNC:-$DIRECT_DEPLOY}"
 
 services=("user-service" "score-service" "analysis-worker" "notification-worker")
 apps=("bodybuddy-app-of-apps" "user-service" "score-service" "analysis-worker" "notification-worker" "karpenter-capacity")
@@ -85,6 +86,10 @@ if [[ "$SUSPEND_ARGOCD_SYNC" = "1" ]]; then
   done
 fi
 
+if [[ "$DIRECT_DEPLOY" = "1" ]]; then
+  echo "Direct deploy mode is enabled. This bypasses normal GitOps convergence and can leave ArgoCD apps OutOfSync."
+fi
+
 if [[ "$DEPLOY_SERVICES" = "1" ]]; then
   render_dir="$ROOT_DIR/tmp/rendered-helm-$(date +%Y%m%d%H%M%S)"
   mkdir -p "$render_dir"
@@ -107,20 +112,19 @@ if [[ "$DEPLOY_SERVICES" = "1" ]]; then
     kubectl rollout status "deployment/$service" -n "$NAMESPACE" --timeout=240s
   done
 else
-  echo "Skipping service deploy. Set DEPLOY_SERVICES=1 to render/apply Helm charts."
+  echo "Skipping service deploy. Set DIRECT_DEPLOY=1 or DEPLOY_SERVICES=1 to render/apply Helm charts."
 fi
 
 if [[ "$RUN_MIGRATION" = "1" ]]; then
   AWS_PROFILE="$AWS_PROFILE" AWS_REGION="$AWS_REGION" NAMESPACE="$NAMESPACE" "$SCRIPT_DIR/dev-migrate.sh"
 else
-  echo "Skipping DB migration. Set RUN_MIGRATION=1 to run it."
+  echo "Skipping DB migration. Set DIRECT_DEPLOY=1 or RUN_MIGRATION=1 to run it."
 fi
 
 if [[ "$RUN_SMOKE" = "1" ]]; then
   AWS_PROFILE="$AWS_PROFILE" AWS_REGION="$AWS_REGION" NAMESPACE="$NAMESPACE" "$SCRIPT_DIR/dev-smoke.sh"
 else
-  echo "Skipping smoke test. Set RUN_SMOKE=1 to run it."
+  echo "Skipping smoke test. Set DIRECT_DEPLOY=1 or RUN_SMOKE=1 to run it."
 fi
 
 echo "Dev environment automation complete."
-
