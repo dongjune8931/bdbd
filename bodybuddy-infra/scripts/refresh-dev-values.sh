@@ -4,7 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TF_DIR="$ROOT_DIR/bodybuddy-infra/terraform/envs/dev"
 HELM_DIR="$ROOT_DIR/bodybuddy-app/deploy/helm"
-KARPENTER_NODE_CLASS="$ROOT_DIR/bodybuddy-infra/argocd/karpenter/ec2-node-class.yaml"
 OBSERVABILITY_APP="$ROOT_DIR/bodybuddy-infra/argocd/apps/observability.yaml"
 DR_DASHBOARD="$ROOT_DIR/bodybuddy-infra/argocd/observability-resources/bodybuddy-dr-dashboard.yaml"
 
@@ -22,7 +21,6 @@ analysis_queue_url="$(jq -r '.analysis_queue_url.value' <<<"$tf_outputs")"
 notification_queue_url="$(jq -r '.notification_queue_url.value' <<<"$tf_outputs")"
 s3_bucket_name="$(jq -r '.s3_bucket_name.value' <<<"$tf_outputs")"
 rds_secret_arn="$(jq -r '.rds_master_user_secret_arn.value' <<<"$tf_outputs")"
-private_subnet_ids="$(jq -r '.private_subnet_ids.value | join(",")' <<<"$tf_outputs")"
 grafana_irsa_role_arn="$(jq -r '.grafana_irsa_role_arn.value' <<<"$tf_outputs")"
 s3_auto_recovery_lambda_name="$(jq -r '.s3_auto_recovery_lambda_name.value' <<<"$tf_outputs")"
 
@@ -85,13 +83,6 @@ for service in "${services[@]}"; do
   image_tag="$(latest_ecr_tag "$repository_url")"
   update_values_file "$service" "$repository_url" "$image_tag"
 done
-
-echo "Updating $KARPENTER_NODE_CLASS"
-PRIVATE_SUBNET_IDS="$private_subnet_ids" perl -0pi -e '
-  my @subnet_ids = split /,/, $ENV{"PRIVATE_SUBNET_IDS"};
-  my $replacement = "subnetSelectorTerms:\n" . join("", map { "    - id: $_\n" } @subnet_ids);
-  s/subnetSelectorTerms:\n(?:\s+- id: .+\n)+/$replacement/s;
-' "$KARPENTER_NODE_CLASS"
 
 echo "Updating $OBSERVABILITY_APP"
 GRAFANA_IRSA_ROLE_ARN="$grafana_irsa_role_arn" perl -0pi -e '

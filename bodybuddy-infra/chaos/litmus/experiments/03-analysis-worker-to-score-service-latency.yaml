@@ -1,0 +1,34 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: analysis-worker-to-score-service-latency
+  namespace: litmus
+  labels:
+    app.kubernetes.io/name: analysis-worker-to-score-service-latency
+    app.kubernetes.io/part-of: bodybuddy
+    app.kubernetes.io/component: chaos-drill
+spec:
+  engineState: active
+  appinfo:
+    appns: bodybuddy
+    applabel: app.kubernetes.io/name=analysis-worker
+    appkind: deployment
+  chaosServiceAccount: litmus-admin
+  jobCleanUpPolicy: retain
+  experiments:
+    - name: pod-network-latency
+      spec:
+        components:
+          env:
+            - name: TOTAL_CHAOS_DURATION
+              value: "60"
+            - name: NETWORK_INTERFACE
+              value: eth0
+            - name: NETWORK_LATENCY
+              value: "2000"
+            - name: JITTER
+              value: "200"
+            - name: PODS_AFFECTED_PERC
+              value: "50"
+            - name: DESTINATION_HOSTS
+              value: score-service.bodybuddy.svc.cluster.local

@@ -117,6 +117,157 @@ Span detail에서는 `analysis-worker`의 outbound `HTTP POST`와 `score-service
 
 ---
 
+## LitmusChaos Dev Drill
+
+LitmusChaos는 BodyBuddy에서 상시 플랫폼으로 운영하지 않고, **dev 환경에서 복원력 증거를 남기기 위한 일회성 장애 주입 도구**로 사용했다. 이번 1차 실험은 `analysis-worker`에 `pod-delete` fault를 주입해 Kubernetes self-healing, SQS 기반 비동기 재처리, 그리고 복구 이후 score 반영 정상 동작을 함께 검증하는 데 초점을 맞췄다.
+
+### Drill Summary
+
+| Item | Result |
+|---|---|
+| Target | `analysis-worker` deployment |
+| Fault | LitmusChaos `pod-delete` |
+| Litmus verdict | `Completed / Pass` |
+| Worker replicas | `1 -> 0 -> 1` |
+| Pod lifecycle | `Terminating -> Pending -> ContainerCreating -> Running` |
+| Analysis queue depth | `0` 유지 |
+| Analysis DLQ depth | `0` 유지 |
+| Post-recovery score check | 정상 반영 확인 |
+
+### What It Proved
+
+- 장애 주입 시 `analysis-worker`가 실제로 종료되고 새 Pod가 재생성됨
+- `Ready Replicas` 패널에서 worker 가용성이 `1 -> 0 -> 1`로 회복됨
+- 복구 직후 CPU usage spike를 통해 새 worker가 다시 처리를 시작했음을 확인
+- Queue / DLQ가 0을 유지해 짧은 장애 구간 동안 메시지 유실이나 backlog 누적 없이 복구됐음을 검증
+
+### Evidence
+
+<!-- TODO: LitmusChaos evidence 이미지를 아래 슬롯에 추가 -->
+<!-- 권장 파일:
+  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/chaosresult-pass.png
+  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-pod-recreation.png
+  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-ready-replicas.png
+  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-cpu-usage.png
+-->
+
+<div align="center">
+  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/chaosresult-pass.png" width="48%" alt="Litmus ChaosResult Pass" />
+  &nbsp;
+  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-pod-recreation.png" width="48%" alt="analysis-worker pod recreation" />
+</div>
+<p align="center"><em>Litmus ChaosResult Pass &nbsp;&nbsp;&nbsp; analysis-worker Pod 재생성</em></p>
+
+<div align="center">
+  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-ready-replicas.png" width="48%" alt="analysis-worker ready replicas" />
+  &nbsp;
+  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-cpu-usage.png" width="48%" alt="analysis-worker cpu usage" />
+</div>
+<p align="center"><em>Ready Replicas 1 -> 0 -> 1 &nbsp;&nbsp;&nbsp; 복구 직후 CPU spike</em></p>
+
+이 실험은 “Pod가 다시 떴다” 수준이 아니라, **장애 주입 -> 가용성 하락 -> 복구 -> 처리 재개**를 Grafana와 Litmus 결과로 함께 확인했다는 점에서 의미가 있다. 이후 동일한 방식으로 `score-service pod-delete`, worker-to-service latency 같은 drill도 확장할 수 있다.
+
+### Drill 2: `score-service` Pod Delete
+
+2차 실험은 동기 API 의존성을 가진 `score-service`를 대상으로 `pod-delete` fault를 주입해, Kubernetes self-healing과 서비스 복구 과정을 검증하는 데 초점을 맞췄다. `analysis-worker` drill이 비동기 재처리와 queue 안정성을 증명했다면, 이번 실험은 **내부 API 의존 서비스가 죽었을 때도 deployment 수준에서 자동 복구가 정상 동작하는가**를 확인하는 단계였다.
+
+#### Drill Summary
+
+| Item | Result |
+|---|---|
+| Target | `score-service` deployment |
+| Fault | LitmusChaos `pod-delete` |
+| Litmus verdict | `Completed / Pass` |
+| Score-service replicas | `1 -> 0 -> 1` |
+| Pod lifecycle | `Terminating -> Pending -> ContainerCreating -> Running` |
+| Ranking read latency panel | 의미 있는 변화 없음 |
+| Recovery check | 새 Pod가 `Running/Ready`로 복귀 확인 |
+
+#### What It Proved
+
+- `score-service` 단일 Pod를 강제로 종료해도 Deployment가 새 Pod를 즉시 재생성함
+- `Ready Replicas` 패널에서 `1 -> 0 -> 1` 복구 흐름이 관측됨
+- Pod 재생성 중 `Pending -> ContainerCreating -> Running` 상태 전이가 실제 터미널 출력으로 확인됨
+- Litmus `ChaosResult`가 `Completed / Pass`로 기록되어 drill 자체가 정상 완료됐음을 증명함
+
+#### Evidence
+
+<!-- TODO: score-service pod-delete evidence 이미지를 아래 슬롯에 추가 -->
+<!-- 권장 파일:
+  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-chaosresult-pass.png
+  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-pod-recreation.png
+  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-ready-replicas.png
+  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-cpu-usage.png
+-->
+
+<div align="center">
+  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-chaosresult-pass.png" width="48%" alt="score-service ChaosResult Pass" />
+  &nbsp;
+  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-pod-recreation.png" width="48%" alt="score-service pod recreation" />
+</div>
+<p align="center"><em>Litmus ChaosResult Pass &nbsp;&nbsp;&nbsp; score-service Pod 재생성</em></p>
+
+<div align="center">
+  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-ready-replicas.png" width="48%" alt="score-service ready replicas" />
+  &nbsp;
+  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-cpu-usage.png" width="48%" alt="score-service cpu usage" />
+</div>
+<p align="center"><em>Ready Replicas 1 -> 0 -> 1 &nbsp;&nbsp;&nbsp; 복구 전후 CPU 변화</em></p>
+
+이 실험은 dramatic한 latency 변화보다, **동기 서비스 장애 시에도 Kubernetes 기본 복구 메커니즘이 예상대로 동작한다**는 운영 증거를 남기는 데 의미가 있다. 특히 1차 `analysis-worker` drill과 함께 보면, 비동기 worker와 동기 API를 각각 다른 장애 모델로 검증했다는 점에서 스토리가 더 탄탄해진다.
+
+### Drill 3: `analysis-worker -> score-service` Network Latency
+
+3차 실험은 [`bodybuddy-infra/chaos/litmus/experiments/03-analysis-worker-to-score-service-latency.yaml`](./bodybuddy-infra/chaos/litmus/experiments/03-analysis-worker-to-score-service-latency.yaml) 로 `analysis-worker`에서 `score-service`로 향하는 내부 호출에 `2s` 지연과 `200ms` jitter를 주입한 drill이다. 앞선 1, 2차가 “Pod가 죽었을 때 다시 뜨는가”를 검증했다면, 이번 실험은 **서비스는 살아 있지만 내부 네트워크가 느려졌을 때 trace와 지표가 병목 위치를 정확히 드러내는가**를 확인하는 데 초점을 맞췄다.
+
+#### Drill Summary
+
+| Item | Result |
+|---|---|
+| Target | `analysis-worker -> score-service` internal call |
+| Fault | LitmusChaos `pod-network-latency` |
+| Injected latency | `2s + 200ms jitter` |
+| Litmus verdict | `Completed / Pass` |
+| Chaos target | `analysis-worker-5c955cd45c-78pxr` |
+| Uploads during drill | `3` |
+| Observed trace | `analysis-worker.processMessage 8.79s`, child `HTTP POST 4.32s` |
+| Score-service server span | `121.33ms` |
+
+#### What It Proved
+
+- Pod 재시작 없이도 네트워크 계층 장애를 주입해 서비스 간 호출 지연을 재현할 수 있음
+- `Analysis Job Duration` 패널에서 실험 시점(`2026-06-17 15:09~15:10 KST`)에 p95와 평균 처리 시간이 함께 상승함
+- Tempo waterfall에서 `analysis-worker.processMessage` 내부의 `HTTP POST` span이 길어지고, 반대로 `score-service` server span 자체는 짧게 유지됨
+- 즉 병목이 애플리케이션 로직이나 DB가 아니라, **worker -> service 네트워크 구간**이라는 점을 trace만으로 설명할 수 있었음
+
+#### Evidence
+
+<!-- TODO: network latency drill evidence 이미지를 아래 슬롯에 추가 -->
+<!-- 권장 파일:
+  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/network-latency-trace-list.png
+  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/network-latency-job-duration.png
+  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/network-latency-waterfall.png
+  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/network-latency-chaosresult-pass.png
+-->
+
+<div align="center">
+  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/network-latency-trace-list.png" width="48%" alt="network latency trace list" />
+  &nbsp;
+  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/network-latency-job-duration.png" width="48%" alt="network latency analysis job duration" />
+</div>
+<p align="center"><em>실험 시각 trace 목록 &nbsp;&nbsp;&nbsp; Analysis Job Duration 상승</em></p>
+
+<div align="center">
+  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/network-latency-waterfall.png" width="48%" alt="network latency waterfall trace" />
+  &nbsp;
+  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/network-latency-chaosresult-pass.png" width="48%" alt="network latency chaosresult pass" />
+</div>
+<p align="center"><em>`HTTP POST` 구간 지연이 드러난 waterfall &nbsp;&nbsp;&nbsp; Litmus ChaosResult Pass</em></p>
+
+이번 3차 실험의 핵심은 “느려졌다”가 아니라, **어디가 느려졌는지 설명할 수 있었다**는 점이다. `HTTP POST 4.32s`와 `score-service /internal/v1/score 121.33ms`가 동시에 보였기 때문에, 내부 서비스 처리보다 네트워크 지연이 병목이라는 해석을 명확히 뒷받침할 수 있었다.
+
+---
+
 ## 부하 테스트 및 오토스케일링
 
 이번 프로젝트에서 더 의미 있게 드러난 병목은 `score-service` read path보다 비동기 분석 파이프라인이었다. 업로드 burst 시 API 응답은 빠르게 유지됐지만, 단일 `analysis-worker`가 backlog를 따라가지 못해 queue depth가 빠르게 증가했다. 이후 KEDA가 SQS depth를 external metric으로 읽어 worker를 자동 확장하면서 backlog가 감소하기 시작했다.

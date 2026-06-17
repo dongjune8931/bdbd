@@ -1,0 +1,30 @@
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: score-service-pod-delete
+  namespace: litmus
+  labels:
+    app.kubernetes.io/name: score-service-pod-delete
+    app.kubernetes.io/part-of: bodybuddy
+    app.kubernetes.io/component: chaos-drill
+spec:
+  engineState: active
+  appinfo:
+    appns: bodybuddy
+    applabel: app.kubernetes.io/name=score-service
+    appkind: deployment
+  chaosServiceAccount: litmus-admin
+  jobCleanUpPolicy: retain
+  experiments:
+    - name: pod-delete
+      spec:
+        components:
+          env:
+            - name: TOTAL_CHAOS_DURATION
+              value: "30"
+            - name: CHAOS_INTERVAL
+              value: "10"
+            - name: FORCE
+              value: "false"
+            - name: PODS_AFFECTED_PERC
+              value: "50"
