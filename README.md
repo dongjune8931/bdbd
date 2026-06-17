@@ -143,23 +143,15 @@ LitmusChaos는 BodyBuddy에서 상시 플랫폼으로 운영하지 않고, **dev
 
 ### Evidence
 
-<!-- TODO: LitmusChaos evidence 이미지를 아래 슬롯에 추가 -->
-<!-- 권장 파일:
-  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/chaosresult-pass.png
-  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-pod-recreation.png
-  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-ready-replicas.png
-  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-cpu-usage.png
--->
-
 <div align="center">
-  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/chaosresult-pass.png" width="48%" alt="Litmus ChaosResult Pass" />
+  <img src="https://github.com/user-attachments/assets/08be2f0c-06da-44ca-9fa5-4ab0b83309ae" width="48%" alt="Litmus ChaosResult Pass" />
   &nbsp;
-  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-pod-recreation.png" width="48%" alt="analysis-worker pod recreation" />
+  <img src="https://github.com/user-attachments/assets/ab3cbf88-f81e-4543-812c-9ab99c709e5d" width="48%" alt="analysis-worker pod recreation" />
 </div>
 <p align="center"><em>Litmus ChaosResult Pass &nbsp;&nbsp;&nbsp; analysis-worker Pod 재생성</em></p>
 
 <div align="center">
-  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-ready-replicas.png" width="48%" alt="analysis-worker ready replicas" />
+  <img src="https://github.com/user-attachments/assets/8e3390e8-42f9-4bcf-9c1b-89823daa75b4"  width="48%" alt="analysis-worker ready replicas" />
   &nbsp;
   <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-cpu-usage.png" width="48%" alt="analysis-worker cpu usage" />
 </div>
@@ -192,23 +184,15 @@ LitmusChaos는 BodyBuddy에서 상시 플랫폼으로 운영하지 않고, **dev
 
 #### Evidence
 
-<!-- TODO: score-service pod-delete evidence 이미지를 아래 슬롯에 추가 -->
-<!-- 권장 파일:
-  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-chaosresult-pass.png
-  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-pod-recreation.png
-  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-ready-replicas.png
-  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-cpu-usage.png
--->
-
 <div align="center">
-  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-chaosresult-pass.png" width="48%" alt="score-service ChaosResult Pass" />
+  <img src="https://github.com/user-attachments/assets/35899579-ed61-41b3-8cd9-c67744eb095e" width="48%" alt="score-service ChaosResult Pass" />
   &nbsp;
-  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-pod-recreation.png" width="48%" alt="score-service pod recreation" />
+  <img src="https://github.com/user-attachments/assets/ca20b8d8-110e-4802-a262-ee8b0f2ad9ac" width="48%" alt="score-service pod recreation" />
 </div>
 <p align="center"><em>Litmus ChaosResult Pass &nbsp;&nbsp;&nbsp; score-service Pod 재생성</em></p>
 
 <div align="center">
-  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-ready-replicas.png" width="48%" alt="score-service ready replicas" />
+  <img src="https://github.com/user-attachments/assets/9ca32513-0e12-45b6-a3d8-afeb8b376388" width="48%" alt="score-service ready replicas" />
   &nbsp;
   <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-cpu-usage.png" width="48%" alt="score-service cpu usage" />
 </div>
@@ -242,25 +226,17 @@ LitmusChaos는 BodyBuddy에서 상시 플랫폼으로 운영하지 않고, **dev
 
 #### Evidence
 
-<!-- TODO: network latency drill evidence 이미지를 아래 슬롯에 추가 -->
-<!-- 권장 파일:
-  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/network-latency-trace-list.png
-  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/network-latency-job-duration.png
-  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/network-latency-waterfall.png
-  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/network-latency-chaosresult-pass.png
--->
-
 <div align="center">
-  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/network-latency-trace-list.png" width="48%" alt="network latency trace list" />
+  <img src="https://github.com/user-attachments/assets/c7c9745e-9469-425c-afc1-ad083b78e45e" width="48%" alt="network latency trace list" />
   &nbsp;
-  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/network-latency-job-duration.png" width="48%" alt="network latency analysis job duration" />
+  <img src="https://github.com/user-attachments/assets/bc70928a-5f1d-4efb-b478-3cfe034e35e9" width="48%" alt="network latency analysis job duration" />
 </div>
 <p align="center"><em>실험 시각 trace 목록 &nbsp;&nbsp;&nbsp; Analysis Job Duration 상승</em></p>
 
 <div align="center">
-  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/network-latency-waterfall.png" width="48%" alt="network latency waterfall trace" />
+  <img src="https://github.com/user-attachments/assets/760732a8-7031-443d-9004-112508cd148e" width="48%" alt="network latency waterfall trace" />
   &nbsp;
-  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/network-latency-chaosresult-pass.png" width="48%" alt="network latency chaosresult pass" />
+  <img src="https://github.com/user-attachments/assets/5ad8b793-c796-4127-848b-4b04e9abf83a" width="48%" alt="network latency chaosresult pass" />
 </div>
 <p align="center"><em>`HTTP POST` 구간 지연이 드러난 waterfall &nbsp;&nbsp;&nbsp; Litmus ChaosResult Pass</em></p>
 
