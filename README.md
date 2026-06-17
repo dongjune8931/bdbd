@@ -105,7 +105,6 @@ Node graph는 서비스 간 호출 관계를 한 눈에 보여준다. 업로드 
 
 #### 2. Waterfall Trace
 
-
 <img width="1168" height="382" alt="스크린샷 2026-05-21 오후 9 05 34" src="https://github.com/user-attachments/assets/ff3c4bf8-eb15-4569-9ad3-ff3f0e4c9e58" />
 
 Waterfall 화면에서는 전체 요청 시간 중 어느 구간이 오래 걸렸는지 확인할 수 있다. 현재 구현에서는 `analysis-worker.processMessage` span이 가장 긴 구간으로 나타나며, Mock OCR 지연과 비동기 분석 비용이 trace 상에서 직접 드러난다.
@@ -144,18 +143,13 @@ LitmusChaos는 BodyBuddy에서 상시 플랫폼으로 운영하지 않고, **dev
 ### Evidence
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/08be2f0c-06da-44ca-9fa5-4ab0b83309ae" width="48%" alt="Litmus ChaosResult Pass" />
+  <img src="https://github.com/user-attachments/assets/08be2f0c-06da-44ca-9fa5-4ab0b83309ae" width="32%" alt="Litmus ChaosResult Pass" />
   &nbsp;
-  <img src="https://github.com/user-attachments/assets/ab3cbf88-f81e-4543-812c-9ab99c709e5d" width="48%" alt="analysis-worker pod recreation" />
-</div>
-<p align="center"><em>Litmus ChaosResult Pass &nbsp;&nbsp;&nbsp; analysis-worker Pod 재생성</em></p>
-
-<div align="center">
-  <img src="https://github.com/user-attachments/assets/8e3390e8-42f9-4bcf-9c1b-89823daa75b4"  width="48%" alt="analysis-worker ready replicas" />
+  <img src="https://github.com/user-attachments/assets/ab3cbf88-f81e-4543-812c-9ab99c709e5d" width="32%" alt="analysis-worker pod recreation" />
   &nbsp;
-  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-cpu-usage.png" width="48%" alt="analysis-worker cpu usage" />
+  <img src="https://github.com/user-attachments/assets/8e3390e8-42f9-4bcf-9c1b-89823daa75b4" width="32%" alt="analysis-worker ready replicas" />
 </div>
-<p align="center"><em>Ready Replicas 1 -> 0 -> 1 &nbsp;&nbsp;&nbsp; 복구 직후 CPU spike</em></p>
+<p align="center"><em>ChaosResult Pass &nbsp;&nbsp;&nbsp; Pod 재생성 &nbsp;&nbsp;&nbsp; Ready Replicas 1 -> 0 -> 1</em></p>
 
 이 실험은 “Pod가 다시 떴다” 수준이 아니라, **장애 주입 -> 가용성 하락 -> 복구 -> 처리 재개**를 Grafana와 Litmus 결과로 함께 확인했다는 점에서 의미가 있다. 이후 동일한 방식으로 `score-service pod-delete`, worker-to-service latency 같은 drill도 확장할 수 있다.
 
@@ -185,18 +179,13 @@ LitmusChaos는 BodyBuddy에서 상시 플랫폼으로 운영하지 않고, **dev
 #### Evidence
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/35899579-ed61-41b3-8cd9-c67744eb095e" width="48%" alt="score-service ChaosResult Pass" />
+  <img src="https://github.com/user-attachments/assets/35899579-ed61-41b3-8cd9-c67744eb095e" width="32%" alt="score-service ChaosResult Pass" />
   &nbsp;
-  <img src="https://github.com/user-attachments/assets/ca20b8d8-110e-4802-a262-ee8b0f2ad9ac" width="48%" alt="score-service pod recreation" />
-</div>
-<p align="center"><em>Litmus ChaosResult Pass &nbsp;&nbsp;&nbsp; score-service Pod 재생성</em></p>
-
-<div align="center">
-  <img src="https://github.com/user-attachments/assets/9ca32513-0e12-45b6-a3d8-afeb8b376388" width="48%" alt="score-service ready replicas" />
+  <img src="https://github.com/user-attachments/assets/ca20b8d8-110e-4802-a262-ee8b0f2ad9ac" width="32%" alt="score-service pod recreation" />
   &nbsp;
-  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/score-service-cpu-usage.png" width="48%" alt="score-service cpu usage" />
+  <img src="https://github.com/user-attachments/assets/9ca32513-0e12-45b6-a3d8-afeb8b376388" width="32%" alt="score-service ready replicas" />
 </div>
-<p align="center"><em>Ready Replicas 1 -> 0 -> 1 &nbsp;&nbsp;&nbsp; 복구 전후 CPU 변화</em></p>
+<p align="center"><em>ChaosResult Pass &nbsp;&nbsp;&nbsp; Pod 재생성 &nbsp;&nbsp;&nbsp; Ready Replicas 1 -> 0 -> 1</em></p>
 
 이 실험은 dramatic한 latency 변화보다, **동기 서비스 장애 시에도 Kubernetes 기본 복구 메커니즘이 예상대로 동작한다**는 운영 증거를 남기는 데 의미가 있다. 특히 1차 `analysis-worker` drill과 함께 보면, 비동기 worker와 동기 API를 각각 다른 장애 모델로 검증했다는 점에서 스토리가 더 탄탄해진다.
 
@@ -260,9 +249,12 @@ LitmusChaos는 BodyBuddy에서 상시 플랫폼으로 운영하지 않고, **dev
 
 ### Case Study: Async Backlog Bottleneck
 
-<img width="1400" height="300" alt="스크린샷 2026-05-22 오전 3 22 11" src="https://github.com/user-attachments/assets/b5c8b72c-547f-4ffd-95e5-5fb9e19d98c0" />
-<img width="689" height="259" alt="스크린샷 2026-05-22 오전 3 20 34" src="https://github.com/user-attachments/assets/19e5c13f-3200-4841-ad4d-a17eabc0d6ae" />
-
+<div align="center">
+  <img src="https://github.com/user-attachments/assets/b5c8b72c-547f-4ffd-95e5-5fb9e19d98c0" width="48%" alt="analysis queue depth and worker scale-out" />
+  &nbsp;
+  <img src="https://github.com/user-attachments/assets/19e5c13f-3200-4841-ad4d-a17eabc0d6ae" width="48%" alt="analysis job duration during autoscaling" />
+</div>
+<p align="center"><em>Queue backlog 감소와 worker scale-out &nbsp;&nbsp;&nbsp; Analysis job duration 관측</em></p>
 
 업로드 burst(`2026-05-22 01:50:44 ~ 01:53:44 KST`) 동안 `user-service`는 약 8,900건의 업로드 요청을 정상 수락했고 `p95 30.35ms`, `error 0%`를 유지했다. 하지만 같은 시점의 `analysis-worker`는 단일 replica로 고정되어 있었고, 그 결과 `analysis-queue` backlog가 `8,816`건까지 누적됐다.
 
@@ -279,14 +271,13 @@ LitmusChaos는 BodyBuddy에서 상시 플랫폼으로 운영하지 않고, **dev
 
 랭킹 조회 경로는 별도 관측 대상이었다. `score-service`의 `GET /api/v1/ranking` trace와 `Ranking Read Duration`, `CPU Usage`, `Ready Replicas` 패널을 함께 관찰해 `N=10 -> 300` 구간에서 latency 증가, CPU 상승, HPA scale-out이 실제로 연결되어 동작함을 검증했다. 이 실험은 dramatic failure를 만들기보다는 **관측성과 오토스케일링 반응을 확인하는 목적**으로 사용했다.
 
-
 이 섹션은 “부하가 올라가면 지표가 어떻게 반응하는가”를 보여주는 근거로 사용하고, 실제 병목 발견 + 해결 스토리는 위의 `analysis-worker` backlog 사례에 집중한다.
 
 ---
 
 ## IaC and Platform Design
 
-**리소스 책임 경계와 운영 주체를 코드로 분리하는 것**에 초점을 맞췄다. Terraform은 VPC, EKS, 데이터스토어, SQS, IAM/IRSA, DR Lambda 같은 클라우드 리소스를 관리하고, ArgoCD는 Helm chart와 add-on을 통해 클러스터 내부 workloads의 desired state를 관리한다.
+BodyBuddy의 인프라는 "Terraform이 AWS 리소스를 만든다" 수준이 아니라, **리소스 책임 경계와 운영 주체를 코드로 분리하는 것**에 초점을 맞췄다. Terraform은 VPC, EKS, 데이터스토어, SQS, IAM/IRSA, DR Lambda 같은 클라우드 리소스를 관리하고, ArgoCD는 Helm chart와 add-on을 통해 클러스터 내부 workloads의 desired state를 관리한다.
 
 핵심 설계 포인트:
 
