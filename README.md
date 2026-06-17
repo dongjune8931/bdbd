@@ -121,6 +121,58 @@ Span detail에서는 `analysis-worker`의 outbound `HTTP POST`와 `score-service
 
 ---
 
+## LitmusChaos Dev Drill
+
+LitmusChaos는 BodyBuddy에서 상시 플랫폼으로 운영하지 않고, **dev 환경에서 복원력 증거를 남기기 위한 일회성 장애 주입 도구**로 사용했다. 이번 1차 실험은 `analysis-worker`에 `pod-delete` fault를 주입해 Kubernetes self-healing, SQS 기반 비동기 재처리, 그리고 복구 이후 score 반영 정상 동작을 함께 검증하는 데 초점을 맞췄다.
+
+### Drill Summary
+
+| Item | Result |
+|---|---|
+| Target | `analysis-worker` deployment |
+| Fault | LitmusChaos `pod-delete` |
+| Litmus verdict | `Completed / Pass` |
+| Worker replicas | `1 -> 0 -> 1` |
+| Pod lifecycle | `Terminating -> Pending -> ContainerCreating -> Running` |
+| Analysis queue depth | `0` 유지 |
+| Analysis DLQ depth | `0` 유지 |
+| Post-recovery score check | 정상 반영 확인 |
+
+### What It Proved
+
+- 장애 주입 시 `analysis-worker`가 실제로 종료되고 새 Pod가 재생성됨
+- `Ready Replicas` 패널에서 worker 가용성이 `1 -> 0 -> 1`로 회복됨
+- 복구 직후 CPU usage spike를 통해 새 worker가 다시 처리를 시작했음을 확인
+- Queue / DLQ가 0을 유지해 짧은 장애 구간 동안 메시지 유실이나 backlog 누적 없이 복구됐음을 검증
+
+### Evidence
+
+<!-- TODO: LitmusChaos evidence 이미지를 아래 슬롯에 추가 -->
+<!-- 권장 파일:
+  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/chaosresult-pass.png
+  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-pod-recreation.png
+  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-ready-replicas.png
+  bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-cpu-usage.png
+-->
+
+<div align="center">
+  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/chaosresult-pass.png" width="48%" alt="Litmus ChaosResult Pass" />
+  &nbsp;
+  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-pod-recreation.png" width="48%" alt="analysis-worker pod recreation" />
+</div>
+<p align="center"><em>Litmus ChaosResult Pass &nbsp;&nbsp;&nbsp; analysis-worker Pod 재생성</em></p>
+
+<div align="center">
+  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-ready-replicas.png" width="48%" alt="analysis-worker ready replicas" />
+  &nbsp;
+  <img src="./bodybuddy-infra/reports/evidence/09-litmuschaos-drill/analysis-worker-cpu-usage.png" width="48%" alt="analysis-worker cpu usage" />
+</div>
+<p align="center"><em>Ready Replicas 1 -> 0 -> 1 &nbsp;&nbsp;&nbsp; 복구 직후 CPU spike</em></p>
+
+이 실험은 “Pod가 다시 떴다” 수준이 아니라, **장애 주입 -> 가용성 하락 -> 복구 -> 처리 재개**를 Grafana와 Litmus 결과로 함께 확인했다는 점에서 의미가 있다. 이후 동일한 방식으로 `score-service pod-delete`, worker-to-service latency 같은 drill도 확장할 수 있다.
+
+---
+
 ## 부하 테스트 및 오토스케일링
 
 이번 프로젝트에서 더 의미 있게 드러난 병목은 `score-service` read path보다 비동기 분석 파이프라인이었다. 업로드 burst 시 API 응답은 빠르게 유지됐지만, 단일 `analysis-worker`가 backlog를 따라가지 못해 queue depth가 빠르게 증가했다. 이후 KEDA가 SQS depth를 external metric으로 읽어 worker를 자동 확장하면서 backlog가 감소하기 시작했다.
