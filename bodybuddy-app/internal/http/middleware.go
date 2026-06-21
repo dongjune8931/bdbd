@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
+	"github.com/bodybuddy/app/internal/observability"
 )
 
 const requestIDKey = "request_id"
@@ -52,6 +55,25 @@ func Logger(logger *slog.Logger) gin.HandlerFunc {
 			slog.Duration("duration", duration),
 			slog.Any("request_id", requestID),
 		)
+	}
+}
+
+// Metrics records common HTTP request metrics for API services.
+func Metrics(metrics *observability.Metrics) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		method := c.Request.Method
+
+		c.Next()
+
+		path := c.FullPath()
+		if path == "" {
+			path = c.Request.URL.Path
+		}
+
+		status := strconv.Itoa(c.Writer.Status())
+		metrics.HTTPRequestsTotal.WithLabelValues(method, path, status).Inc()
+		metrics.HTTPRequestDuration.WithLabelValues(method, path).Observe(time.Since(start).Seconds())
 	}
 }
 

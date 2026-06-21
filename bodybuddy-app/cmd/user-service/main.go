@@ -70,6 +70,7 @@ func main() {
 	r.Use(bbhttp.Recovery(slog.Default()))
 	r.Use(bbhttp.RequestID())
 	r.Use(otelgin.Middleware(cfg.ServiceName))
+	r.Use(bbhttp.Metrics(metrics))
 	r.Use(bbhttp.Logger(slog.Default()))
 
 	health := bbhttp.NewHealthHandlers(dbPool, redisClient)

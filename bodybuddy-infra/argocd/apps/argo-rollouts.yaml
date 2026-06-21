@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-rollouts
+  namespace: bodybuddy-system
+  labels:
+    app.kubernetes.io/part-of: bodybuddy
+    app.kubernetes.io/component: release-engineering
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: bodybuddy
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-rollouts
+    targetRevision: 2.40.5
+    helm:
+      values: |
+        installCRDs: true
+        dashboard:
+          enabled: false
+        controller:
+          metrics:
+            enabled: true
+            serviceMonitor:
+              enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bodybuddy-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

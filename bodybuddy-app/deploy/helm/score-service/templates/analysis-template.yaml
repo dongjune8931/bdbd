@@ -1,0 +1,37 @@
+{{- if .Values.rollout.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: score-service-release-check
+  labels:
+    {{- include "score-service.labels" . | nindent 4 }}
+spec:
+  metrics:
+    - name: score-service-error-rate
+      interval: {{ .Values.rollout.analysis.interval }}
+      count: {{ .Values.rollout.analysis.count }}
+      failureLimit: {{ .Values.rollout.analysis.failureLimit }}
+      successCondition: {{ .Values.rollout.analysis.successConditionErrorRate | quote }}
+      provider:
+        prometheus:
+          address: {{ .Values.rollout.analysis.prometheusAddress | quote }}
+          query: |
+            (
+              sum(rate(bodybuddy_http_requests_total{service="score-service",path="{{ .Values.rollout.analysis.rankingPath }}",status=~"5.."}[2m]))
+              /
+              clamp_min(sum(rate(bodybuddy_http_requests_total{service="score-service",path="{{ .Values.rollout.analysis.rankingPath }}"}[2m])), 0.001)
+            ) or on() vector(0)
+    - name: score-service-ranking-p95
+      interval: {{ .Values.rollout.analysis.interval }}
+      count: {{ .Values.rollout.analysis.count }}
+      failureLimit: {{ .Values.rollout.analysis.failureLimit }}
+      successCondition: {{ .Values.rollout.analysis.successConditionP95 | quote }}
+      provider:
+        prometheus:
+          address: {{ .Values.rollout.analysis.prometheusAddress | quote }}
+          query: |
+            histogram_quantile(
+              0.95,
+              sum(rate(bodybuddy_http_request_duration_seconds_bucket{service="score-service",path="{{ .Values.rollout.analysis.rankingPath }}"}[2m])) by (le)
+            ) or on() vector(0)
+{{- end }}
