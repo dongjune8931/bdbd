@@ -12,6 +12,7 @@ This repository area is the operational side of BodyBuddy. It describes how the 
 | GitOps | ArgoCD App-of-Apps, service applications, observability, cost tooling |
 | Recovery | RDS PITR, S3 object recovery, GitOps cluster recovery |
 | Chaos drills | One-off LitmusChaos dev drills for measured resilience evidence |
+| Release engineering | Argo Rollouts canary strategy with Prometheus analysis gates |
 | Reports | RTO/RPO matrix, Spot interruption drill, load-test results, chaos drill results |
 
 ## Directory Map
@@ -49,6 +50,7 @@ reports/
 - [RTO / RPO Matrix](./reports/rto-rpo-matrix.md)
 - [Load Test Report](./reports/load-test-report.md)
 - [LitmusChaos Dev Drill Report](./reports/09-litmuschaos-dev-drill.md)
+- [Release Engineering with Argo Rollouts](./reports/release-engineering-rollouts.md)
 - [Reports Index](./reports/README.md)
 
 Detailed drill reports and raw screenshots live under `reports/` and `reports/evidence/`.
