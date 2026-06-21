@@ -9,6 +9,7 @@ spec:
     - https://github.com/dongjune8931/bdbd.git
     - https://kedacore.github.io/charts
     - https://prometheus-community.github.io/helm-charts
+    - https://argoproj.github.io/argo-helm
     - https://kubecost.github.io/cost-analyzer/
     - https://kubernetes-sigs.github.io/metrics-server/
   destinations:
