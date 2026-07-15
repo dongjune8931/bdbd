@@ -74,8 +74,25 @@ user-service -> presigned PUT -> S3 ObjectCreated -> SQS analysis queue
 
 - EasyOCR CPU 이미지 빌드 및 모델 로딩 성공
 - LocalStack S3 원본 다운로드와 OCR runtime 호출 성공
-- 한글 합성 샘플은 모델 품질 한계로 필드 파싱에 실패했으며, 영문 모델 smoke test와 실제 인바디 샘플 EKS 검증을 분리해 기록한다.
+- 한글·영문 합성 샘플은 모델 품질 한계로 필드 파싱에 실패했으며, 실제 인바디 샘플 EKS 검증과 분리해 기록한다.
 - GPU 실측값은 dev 클러스터를 다시 올린 뒤 별도 드릴에서만 기록하며, 로컬 CPU 결과를 GPU 성능으로 주장하지 않는다.
+
+## CI 및 AWS 사전 점검
+
+2026-07-15 기준:
+
+- Go test, Python syntax, golangci와 Docker build 6종 통과
+- CUDA 기반 EasyOCR runtime 이미지 빌드 통과
+- dev EKS와 실행 중 EC2가 없는 상태에서 드릴 사전 점검 수행
+- `g4dn.xlarge`는 서울 리전 `2a`, `2b`, `2c`에서 제공됨을 확인
+- 계정의 On-Demand G/VT quota가 `0 vCPU`여서 GPU 노드 실행이 불가능한 상태를 발견
+- 최소 실행량인 `4 vCPU` quota 증가 요청 제출
+  - request id: `2be9f11eed98450082eae84afec38963PMD7W13V`
+  - support case: `178410058900312`
+  - status: `CASE_OPENED`
+- quota 승인 전에 EKS를 생성하면 GPU 실험 없이 EKS/NAT/RDS 비용만 발생하므로 Terraform apply를 보류했다.
+
+실제 EKS GPU 수치와 Grafana 증거는 quota 승인 후 이 문서에 이어서 기록한다.
 
 ## 포트폴리오 문장 예시
 
