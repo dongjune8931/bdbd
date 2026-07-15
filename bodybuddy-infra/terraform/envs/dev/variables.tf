@@ -101,6 +101,8 @@ variable "ecr_repositories" {
     "user-service",
     "score-service",
     "analysis-worker",
+    "inference-service",
+    "ocr-runtime",
     "notification-worker",
   ]
 }

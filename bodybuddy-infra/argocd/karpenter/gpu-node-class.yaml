@@ -1,0 +1,23 @@
+# AMI was resolved from the official EKS SSM path for Kubernetes 1.33:
+# /aws/service/eks/optimized-ami/1.33/amazon-linux-2023/x86_64/nvidia/recommended/image_id
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: gpu
+spec:
+  amiFamily: AL2023
+  amiSelectorTerms:
+    - id: ami-0d8c01af60b24ddcc
+  role: bodybuddy-dev-eks-karpenter-node
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: bodybuddy-dev-eks
+        kubernetes.io/role/internal-elb: "1"
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: bodybuddy-dev-eks
+  tags:
+    Environment: dev
+    ManagedBy: argocd
+    Project: bodybuddy
+    karpenter.sh/discovery: bodybuddy-dev-eks

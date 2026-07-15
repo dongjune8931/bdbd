@@ -2,25 +2,28 @@
 
 Go service and Helm chart workspace for BodyBuddy.
 
-The application side contains four small services that are intentionally split by traffic and reliability characteristics rather than by business noun alone.
+The application side contains five small services that are intentionally split by traffic and reliability characteristics rather than by business noun alone.
 
 ## Services
 
 | Service | Type | Responsibility |
 |---|---|---|
-| `user-service` | HTTP API | Auth, profile, upload request creation, analysis queue publish |
+| `user-service` | HTTP API | Auth, profile, presigned upload URL creation |
 | `score-service` | HTTP API | Character state, score history, ranking read/update |
-| `analysis-worker` | Worker | SQS consumer, mock OCR delay, score calculation, score-service callback |
+| `analysis-worker` | Worker | SQS consumer, orchestration, score-service callback |
+| `inference-service` | Internal API | S3 image loading, EasyOCR field extraction, score input generation |
 | `notification-worker` | Worker | SQS consumer for notification events |
 
 ## Request Flow
 
 ```text
 POST /api/v1/uploads
-  -> user-service writes upload metadata
-  -> user-service publishes analysis message to SQS
+  -> user-service writes upload metadata and returns a presigned S3 PUT URL
+  -> client uploads the image directly to S3
+  -> S3 ObjectCreated is routed to the analysis SQS queue
   -> analysis-worker consumes the message
-  -> analysis-worker simulates OCR and calculates score
+  -> analysis-worker calls inference-service
+  -> inference-service runs EasyOCR through a PyTorch CPU/CUDA runtime
   -> analysis-worker calls score-service
   -> score-service updates PostgreSQL and Redis ranking
   -> score-service publishes notification event
@@ -62,9 +65,21 @@ Important conventions:
 
 - API services use `workload-type=critical`
 - Worker services use `workload-type=batch`
+- `inference-service` uses `workload-type=gpu`
 - ServiceMonitor templates expose metrics to Prometheus
 - API services can enable HPA through chart values
 - Worker charts set long termination grace periods for interruption handling
+
+## GPU Inference MVP
+
+The upload pipeline now separates inference from queue orchestration:
+
+- `analysis-worker` owns SQS polling, retries, and fallback behavior
+- `inference-service` owns S3 image loading, EasyOCR execution, and field parsing
+- GPU scheduling is isolated through a dedicated `gpu-pool` and `nvidia.com/gpu` resource requests
+- the default replica count is zero; `values.gpu-drill.yaml` enables one on-demand `g4dn.xlarge` node only during evidence drills
+
+This keeps the project aligned with its infrastructure goal: showing how a CPU-based async worker can call, observe, and safely fall back from a separately scheduled GPU workload without turning model training into the project focus.
 
 ## Load-Test Scripts
 

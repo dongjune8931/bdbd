@@ -22,6 +22,7 @@ notification_queue_url="$(jq -r '.notification_queue_url.value' <<<"$tf_outputs"
 s3_bucket_name="$(jq -r '.s3_bucket_name.value' <<<"$tf_outputs")"
 rds_secret_arn="$(jq -r '.rds_master_user_secret_arn.value' <<<"$tf_outputs")"
 grafana_irsa_role_arn="$(jq -r '.grafana_irsa_role_arn.value' <<<"$tf_outputs")"
+inference_service_irsa_role_arn="$(jq -r '.inference_service_irsa_role_arn.value' <<<"$tf_outputs")"
 s3_auto_recovery_lambda_name="$(jq -r '.s3_auto_recovery_lambda_name.value' <<<"$tf_outputs")"
 
 echo "Reading current RDS password from Secrets Manager"
@@ -76,13 +77,28 @@ update_values_file() {
     ' "$file"
 }
 
-services=("user-service" "score-service" "analysis-worker" "notification-worker")
+services=("user-service" "score-service" "analysis-worker" "inference-service" "notification-worker")
 
 for service in "${services[@]}"; do
   repository_url="$(jq -r --arg service "$service" '.ecr_repository_urls.value[$service]' <<<"$tf_outputs")"
   image_tag="$(latest_ecr_tag "$repository_url")"
   update_values_file "$service" "$repository_url" "$image_tag"
 done
+
+ocr_runtime_repository_url="$(jq -r '.ecr_repository_urls.value["ocr-runtime"]' <<<"$tf_outputs")"
+ocr_runtime_image_tag="$(latest_ecr_tag "$ocr_runtime_repository_url")"
+echo "Updating inference-service OCR runtime image"
+OCR_RUNTIME_REPOSITORY="$ocr_runtime_repository_url" \
+  OCR_RUNTIME_TAG="$ocr_runtime_image_tag" \
+  perl -0pi -e '
+    s#(^  imageRepository: ).*$#$1$ENV{"OCR_RUNTIME_REPOSITORY"}#m;
+    s#(^  imageTag: ).*$#$1$ENV{"OCR_RUNTIME_TAG"}#m;
+  ' "$HELM_DIR/inference-service/values.yaml"
+
+echo "Updating inference-service IRSA annotation"
+INFERENCE_SERVICE_IRSA_ROLE_ARN="$inference_service_irsa_role_arn" perl -0pi -e '
+  s#(^\s*eks\.amazonaws\.com/role-arn:\s*).*$#$1$ENV{"INFERENCE_SERVICE_IRSA_ROLE_ARN"}#m;
+' "$HELM_DIR/inference-service/values.yaml"
 
 echo "Updating $OBSERVABILITY_APP"
 GRAFANA_IRSA_ROLE_ARN="$grafana_irsa_role_arn" perl -0pi -e '

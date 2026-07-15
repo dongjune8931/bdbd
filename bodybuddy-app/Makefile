@@ -1,5 +1,5 @@
 .PHONY: build test lint \
-	run-user-service run-score-service run-analysis-worker run-notification-worker \
+	run-user-service run-score-service run-analysis-worker run-notification-worker run-inference-service \
 	docker-build migrate-up migrate-down \
 	load-upload-smoke load-ranking-smoke
 
@@ -26,6 +26,9 @@ run-score-service:
 run-analysis-worker:
 	go run ./cmd/analysis-worker/
 
+run-inference-service:
+	go run ./cmd/inference-service/
+
 run-notification-worker:
 	go run ./cmd/notification-worker/
 
@@ -34,6 +37,7 @@ docker-build:
 	docker build -f deploy/docker/Dockerfile.user-service         -t bodybuddy/user-service:dev .
 	docker build -f deploy/docker/Dockerfile.score-service        -t bodybuddy/score-service:dev .
 	docker build -f deploy/docker/Dockerfile.analysis-worker      -t bodybuddy/analysis-worker:dev .
+	docker build -f deploy/docker/Dockerfile.inference-service    -t bodybuddy/inference-service:dev .
 	docker build -f deploy/docker/Dockerfile.notification-worker  -t bodybuddy/notification-worker:dev .
 
 # Apply migrations against the local Postgres container (assumes docker-compose is up).

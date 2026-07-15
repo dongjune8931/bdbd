@@ -8,8 +8,10 @@ import (
 	"log/slog"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -24,10 +26,32 @@ import (
 	"github.com/bodybuddy/app/internal/db"
 	"github.com/bodybuddy/app/internal/domain"
 	bbhttp "github.com/bodybuddy/app/internal/http"
+	"github.com/bodybuddy/app/internal/inference"
 	"github.com/bodybuddy/app/internal/observability"
 	"github.com/bodybuddy/app/internal/queue"
 	"github.com/gin-gonic/gin"
 )
+
+type analysisPayload struct {
+	UserID   string `json:"user_id"`
+	UploadID string `json:"upload_id"`
+	S3Key    string `json:"s3_key"`
+}
+
+type s3ObjectCreatedEvent struct {
+	Records []struct {
+		S3 struct {
+			Object struct {
+				Key string `json:"key"`
+			} `json:"object"`
+		} `json:"s3"`
+	} `json:"Records"`
+	Detail struct {
+		Object struct {
+			Key string `json:"key"`
+		} `json:"object"`
+	} `json:"detail"`
+}
 
 func main() {
 	// --- Logging ---
@@ -72,6 +96,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	var inferenceClient *inference.Client
+	if cfg.InferenceServiceURL != "" {
+		inferenceClient = inference.NewClient(
+			cfg.InferenceServiceURL,
+			time.Duration(cfg.InferenceTimeoutSeconds)*time.Second,
+		)
+	}
+
 	// --- Metrics HTTP Server (separate from SQS polling loop) ---
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
@@ -105,7 +137,7 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		runPollingLoop(ctx, cfg, sqsClient, metrics)
+		runPollingLoop(ctx, cfg, sqsClient, inferenceClient, metrics)
 	}()
 
 	// Wait for termination signal.
@@ -127,7 +159,7 @@ func main() {
 // runPollingLoop polls the analysis queue until ctx is cancelled.
 // When the context is cancelled (SIGTERM/SIGINT), it stops accepting new messages
 // but finishes processing any messages already received.
-func runPollingLoop(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *queue.Client, metrics *observability.Metrics) {
+func runPollingLoop(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *queue.Client, inferenceClient *inference.Client, metrics *observability.Metrics) {
 	slog.Info("analysis-worker polling started", "queue", cfg.AnalysisQueueURL)
 
 	for {
@@ -159,16 +191,16 @@ func runPollingLoop(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *
 		for _, msg := range msgs {
 			// Process each message synchronously to keep the shutdown flow simple.
 			// In a high-throughput scenario, spawn bounded goroutines with a semaphore.
-			processMessage(ctx, cfg, sqsClient, msg, metrics)
+			processMessage(ctx, cfg, sqsClient, inferenceClient, msg, metrics)
 		}
 	}
 }
 
-// processMessage executes the Mock OCR pipeline for a single SQS message.
+// processMessage executes the analysis pipeline for a single SQS message.
 // Message body is expected to contain a JSON object with at least:
 //
 //	{ "user_id": "...", "upload_id": "...", "s3_key": "..." }
-func processMessage(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *queue.Client, msg queue.Message, metrics *observability.Metrics) {
+func processMessage(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *queue.Client, inferenceClient *inference.Client, msg queue.Message, metrics *observability.Metrics) {
 	// Extract trace context propagated via SQS message attributes.
 	ctx = otel.GetTextMapPropagator().Extract(ctx, queue.NewSQSReadCarrier(msg.Attributes))
 
@@ -178,12 +210,8 @@ func processMessage(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *
 
 	start := time.Now()
 
-	var payload struct {
-		UserID   string `json:"user_id"`
-		UploadID string `json:"upload_id"`
-		S3Key    string `json:"s3_key"`
-	}
-	if err := json.Unmarshal([]byte(msg.Body), &payload); err != nil {
+	payload, err := decodeAnalysisPayload(msg.Body)
+	if err != nil {
 		slog.Error("failed to parse message body", "message_id", msg.MessageID, "error", err)
 		span.SetStatus(codes.Error, "failed to parse message body")
 		// Do not delete — let DLQ handle malformed messages after maxReceiveCount.
@@ -202,30 +230,33 @@ func processMessage(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *
 		"upload_id", payload.UploadID,
 	)
 
-	// Step 1: Simulate OCR processing delay (2–5 seconds).
-	// Real implementation would call an OCR API here with retry + timeout.
-	// #nosec G404 — intentional use of weak RNG for jitter simulation
-	jitter := time.Duration(2000+rand.Intn(3000)) * time.Millisecond //nolint:gosec
-	select {
-	case <-time.After(jitter):
-	case <-ctx.Done():
-		slog.Warn("context cancelled during mock OCR sleep, re-queuing message",
+	// Step 1: Run remote inference if configured. Fall back to in-process mock
+	// when the MVP inference service is unavailable or intentionally disabled.
+	breakdown, accelerator, modelVersion, err := runInference(ctx, cfg, inferenceClient, payload, msg.MessageID, metrics)
+	if err != nil {
+		slog.Error("failed to analyze upload",
 			"message_id", msg.MessageID,
+			"error", err,
 		)
-		metrics.AnalysisJobsProcessed.WithLabelValues("retry").Inc()
+		span.SetStatus(codes.Error, err.Error())
+		metrics.AnalysisJobsProcessed.WithLabelValues("failure").Inc()
 		return
 	}
 
-	// Step 2: Generate a deterministic mock score based on user ID.
-	breakdown := domain.CalculateMockScore(payload.UserID)
+	span.SetAttributes(
+		attribute.String("inference.accelerator", accelerator),
+		attribute.String("inference.model_version", modelVersion),
+	)
 
-	slog.Info("mock OCR complete",
+	slog.Info("analysis complete",
 		"message_id", msg.MessageID,
 		"user_id", payload.UserID,
 		"score", breakdown.Total,
+		"accelerator", accelerator,
+		"model_version", modelVersion,
 	)
 
-	// Step 3: Call score-service to persist the result.
+	// Step 2: Call score-service to persist the result.
 	if err := postScore(ctx, cfg.ScoreServiceURL, payload.UserID, payload.UploadID, breakdown); err != nil {
 		slog.Error("failed to post score to score-service",
 			"message_id", msg.MessageID,
@@ -237,7 +268,7 @@ func processMessage(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *
 		return
 	}
 
-	// Step 4: Delete the message only after successful processing (at-least-once semantics).
+	// Step 3: Delete the message only after successful processing (at-least-once semantics).
 	if err := sqsClient.DeleteMessage(ctx, cfg.AnalysisQueueURL, msg.ReceiptHandle); err != nil {
 		slog.Error("failed to delete SQS message", "message_id", msg.MessageID, "error", err)
 	}
@@ -252,6 +283,108 @@ func processMessage(ctx context.Context, cfg *config.AnalysisWorker, sqsClient *
 		"message_id", msg.MessageID,
 		"duration_ms", duration.Milliseconds(),
 	)
+}
+
+func runInference(
+	ctx context.Context,
+	cfg *config.AnalysisWorker,
+	inferenceClient *inference.Client,
+	payload analysisPayload,
+	messageID string,
+	metrics *observability.Metrics,
+) (domain.ScoreBreakdown, string, string, error) {
+	if inferenceClient != nil {
+		inferenceStart := time.Now()
+		inferCtx, cancel := context.WithTimeout(ctx, time.Duration(cfg.InferenceTimeoutSeconds)*time.Second)
+		defer cancel()
+
+		resp, err := inferenceClient.Analyze(inferCtx, inference.Request{
+			UserID:   payload.UserID,
+			UploadID: payload.UploadID,
+			S3Key:    payload.S3Key,
+		})
+		metrics.InferenceRequestDuration.WithLabelValues("remote").Observe(time.Since(inferenceStart).Seconds())
+		if err == nil {
+			metrics.InferenceRequestsTotal.WithLabelValues("success", "remote").Inc()
+			return resp.ScoreBreakdown, resp.Accelerator, resp.ModelVersion, nil
+		}
+
+		slog.Warn("remote inference failed",
+			"message_id", messageID,
+			"upload_id", payload.UploadID,
+			"error", err,
+		)
+		metrics.InferenceRequestsTotal.WithLabelValues("failure", "remote").Inc()
+		if !cfg.InferenceFallbackToMock {
+			return domain.ScoreBreakdown{}, "", "", err
+		}
+	}
+
+	mockStart := time.Now()
+	breakdown, err := runMockInference(ctx, payload.UserID, messageID, metrics)
+	metrics.InferenceRequestDuration.WithLabelValues("mock").Observe(time.Since(mockStart).Seconds())
+	if err != nil {
+		metrics.InferenceRequestsTotal.WithLabelValues("failure", "mock").Inc()
+		return domain.ScoreBreakdown{}, "", "", err
+	}
+
+	if inferenceClient != nil {
+		metrics.InferenceRequestsTotal.WithLabelValues("fallback", "mock").Inc()
+	} else {
+		metrics.InferenceRequestsTotal.WithLabelValues("success", "mock").Inc()
+	}
+	return breakdown, "cpu-mock-fallback", "mock-ocr-v1", nil
+}
+
+func decodeAnalysisPayload(body string) (analysisPayload, error) {
+	var direct analysisPayload
+	if err := json.Unmarshal([]byte(body), &direct); err == nil && direct.UserID != "" && direct.UploadID != "" && direct.S3Key != "" {
+		return direct, nil
+	}
+
+	var event s3ObjectCreatedEvent
+	if err := json.Unmarshal([]byte(body), &event); err != nil {
+		return analysisPayload{}, fmt.Errorf("decoding S3 event: %w", err)
+	}
+
+	key := event.Detail.Object.Key
+	if key == "" && len(event.Records) > 0 {
+		key = event.Records[0].S3.Object.Key
+	}
+	if key == "" {
+		return analysisPayload{}, fmt.Errorf("message contains no supported upload payload or S3 object key")
+	}
+
+	decodedKey, err := url.QueryUnescape(key)
+	if err != nil {
+		return analysisPayload{}, fmt.Errorf("decoding S3 object key: %w", err)
+	}
+	parts := strings.Split(strings.Trim(decodedKey, "/"), "/")
+	if len(parts) != 3 || parts[0] != "uploads" || parts[1] == "" || parts[2] == "" {
+		return analysisPayload{}, fmt.Errorf("unexpected S3 upload key %q", decodedKey)
+	}
+
+	return analysisPayload{
+		UserID:   parts[1],
+		UploadID: parts[2],
+		S3Key:    decodedKey,
+	}, nil
+}
+
+func runMockInference(ctx context.Context, userID, messageID string, metrics *observability.Metrics) (domain.ScoreBreakdown, error) {
+	// #nosec G404 — intentional use of weak RNG for jitter simulation in mock mode.
+	jitter := time.Duration(2000+rand.Intn(3000)) * time.Millisecond //nolint:gosec
+	select {
+	case <-time.After(jitter):
+	case <-ctx.Done():
+		slog.Warn("context cancelled during mock OCR sleep, re-queuing message",
+			"message_id", messageID,
+		)
+		metrics.AnalysisJobsProcessed.WithLabelValues("retry").Inc()
+		return domain.ScoreBreakdown{}, ctx.Err()
+	}
+
+	return domain.CalculateMockScore(userID), nil
 }
 
 // postScore calls score-service POST /internal/v1/score with the analysis result.

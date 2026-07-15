@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: inference-service
+  namespace: bodybuddy-system
+  labels:
+    app.kubernetes.io/part-of: bodybuddy
+    app.kubernetes.io/component: worker
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: bodybuddy
+  source:
+    repoURL: https://github.com/dongjune8931/bdbd.git
+    targetRevision: main
+    path: bodybuddy-app/deploy/helm/inference-service
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bodybuddy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - SkipDryRunOnMissingResource=true

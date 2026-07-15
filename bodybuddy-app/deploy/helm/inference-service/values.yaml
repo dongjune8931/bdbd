@@ -1,0 +1,79 @@
+# GPU nodes are drill-only. Use values.gpu-drill.yaml to enable one replica.
+replicaCount: 0
+
+image:
+  repository: 902371998304.dkr.ecr.ap-northeast-2.amazonaws.com/bodybuddy-dev-inference-service
+  tag: latest
+  pullPolicy: IfNotPresent
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::902371998304:role/bodybuddy-dev-inference-service-irsa
+
+podAnnotations: {}
+
+podLabels: {}
+
+service:
+  type: ClusterIP
+  port: 8083
+  targetPort: 8083
+  runtimePort: 8090
+
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+ocrRuntime:
+  imageRepository: 902371998304.dkr.ecr.ap-northeast-2.amazonaws.com/bodybuddy-dev-ocr-runtime
+  imageTag: latest
+  pullPolicy: IfNotPresent
+  port: 8090
+  device: cuda
+  languages: ko,en
+  modelVersion: easyocr-1.7.2-ko-en
+  maxImageBytes: "10485760"
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+      nvidia.com/gpu: 1
+    limits:
+      memory: 6Gi
+      nvidia.com/gpu: 1
+
+pdb:
+  enabled: true
+  maxUnavailable: 1
+
+config:
+  serviceName: inference-service
+  logLevel: info
+  httpPort: 8083
+  awsRegion: ap-northeast-2
+  s3Bucket: bodybuddy-dev-inbody
+  otelEndpoint: "otel-collector-opentelemetry-collector.bodybuddy-system:4317"
+  ocrRuntimeUrl: http://127.0.0.1:8090
+  ocrRuntimeTimeoutSeconds: 20
+  ocrMaxImageBytes: "10485760"
+
+nodeSelector:
+  workload-type: gpu
+
+tolerations:
+  - key: workload-type
+    operator: Equal
+    value: gpu
+    effect: NoSchedule
+
+affinity: {}

@@ -66,6 +66,12 @@ spec:
               value: {{ .Values.config.sqsWaitTimeSeconds | quote }}
             - name: SCORE_SERVICE_URL
               value: {{ .Values.config.scoreServiceUrl | quote }}
+            - name: INFERENCE_SERVICE_URL
+              value: {{ dig "inferenceServiceUrl" "http://inference-service.bodybuddy.svc.cluster.local:8083" .Values.config | quote }}
+            - name: INFERENCE_TIMEOUT_SECONDS
+              value: {{ dig "inferenceTimeoutSeconds" 20 .Values.config | quote }}
+            - name: INFERENCE_FALLBACK_TO_MOCK
+              value: {{ dig "inferenceFallbackToMock" true .Values.config | quote }}
             - name: DB_USER
               valueFrom:
                 secretKeyRef:

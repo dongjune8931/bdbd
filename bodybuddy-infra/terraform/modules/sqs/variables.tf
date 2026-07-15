@@ -8,6 +8,11 @@ variable "analysis_queue_name" {
   type        = string
 }
 
+variable "analysis_source_bucket_name" {
+  description = "S3 bucket whose ObjectCreated events are routed to the analysis queue."
+  type        = string
+}
+
 variable "notification_queue_name" {
   description = "Name of the notification queue."
   type        = string

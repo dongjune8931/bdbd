@@ -1,0 +1,29 @@
+FROM python:3.11-slim-bookworm
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    OCR_DEVICE=cpu \
+    OCR_MODEL_STORAGE=/models \
+    HOME=/tmp
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY inference-runtime/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir -r requirements.txt
+
+COPY inference-runtime/download_models.py ./download_models.py
+RUN mkdir -p /models \
+    && python download_models.py \
+    && chmod -R a=rX /models
+
+COPY inference-runtime/app.py ./app.py
+
+USER 65532:65532
+EXPOSE 8090
+
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8090", "--no-access-log"]

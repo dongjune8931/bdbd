@@ -5,9 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"mime"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,7 +18,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/bodybuddy/app/internal/auth"
 	"github.com/bodybuddy/app/internal/cache"
 	"github.com/bodybuddy/app/internal/config"
@@ -23,9 +25,8 @@ import (
 	"github.com/bodybuddy/app/internal/domain"
 	bbhttp "github.com/bodybuddy/app/internal/http"
 	"github.com/bodybuddy/app/internal/observability"
-	"github.com/bodybuddy/app/internal/queue"
+	"github.com/bodybuddy/app/internal/storage"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
-	"go.opentelemetry.io/otel"
 )
 
 func main() {
@@ -59,9 +60,13 @@ func main() {
 	redisClient := cache.New(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisTLSEnabled)
 	defer redisClient.Close()
 
-	sqsClient, err := queue.New(context.Background(), cfg.AWSRegion, cfg.SQSEndpoint)
+	presignEndpoint := cfg.S3PresignEndpoint
+	if presignEndpoint == "" {
+		presignEndpoint = cfg.S3Endpoint
+	}
+	s3Presigner, err := storage.NewS3Presigner(context.Background(), cfg.AWSRegion, presignEndpoint, cfg.S3Bucket)
 	if err != nil {
-		slog.Error("failed to create SQS client", "error", err)
+		slog.Error("failed to create S3 presigner", "error", err)
 		os.Exit(1)
 	}
 
@@ -87,7 +92,7 @@ func main() {
 	protected.Use(auth.Middleware(cfg.JWTSecret))
 	{
 		protected.GET("/profile", getProfileHandler(dbPool))
-		protected.POST("/uploads", createUploadHandler(cfg, dbPool, sqsClient, metrics))
+		protected.POST("/uploads", createUploadHandler(dbPool, s3Presigner, metrics))
 	}
 
 	addr := fmt.Sprintf(":%d", cfg.HTTPPort)
@@ -215,12 +220,13 @@ func getProfileHandler(pool *db.Pool) gin.HandlerFunc {
 }
 
 type uploadRequest struct {
-	Filename string `json:"filename" binding:"required"`
+	Filename    string `json:"filename" binding:"required"`
+	ContentType string `json:"content_type"`
 }
 
-// createUploadHandler records an upload and enqueues it for analysis.
-// In production this would also generate a presigned S3 URL for direct client upload.
-func createUploadHandler(cfg *config.UserService, pool *db.Pool, sqsClient *queue.Client, metrics *observability.Metrics) gin.HandlerFunc {
+// createUploadHandler records an upload and returns a direct S3 PUT URL. The
+// S3 ObjectCreated event enqueues analysis only after the image exists.
+func createUploadHandler(pool *db.Pool, presigner *storage.S3Presigner, metrics *observability.Metrics) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		claims, _ := auth.ClaimsFromContext(c)
 
@@ -233,6 +239,15 @@ func createUploadHandler(cfg *config.UserService, pool *db.Pool, sqsClient *queu
 
 		uploadID := uuid.New().String()
 		s3Key := fmt.Sprintf("uploads/%s/%s", claims.UserID, uploadID)
+		contentType := strings.TrimSpace(req.ContentType)
+		if contentType == "" {
+			contentType = mime.TypeByExtension(strings.ToLower(filepath.Ext(req.Filename)))
+		}
+		if !strings.HasPrefix(strings.ToLower(contentType), "image/") {
+			metrics.UploadRequestsTotal.WithLabelValues("rejected").Inc()
+			c.JSON(http.StatusBadRequest, gin.H{"error": "content_type must be an image"})
+			return
+		}
 
 		_, err := pool.Exec(c.Request.Context(),
 			`INSERT INTO inbody_uploads (id, user_id, s3_key, status, idempotency_key)
@@ -246,34 +261,28 @@ func createUploadHandler(cfg *config.UserService, pool *db.Pool, sqsClient *queu
 			return
 		}
 
-		// Publish to analysis queue (in production, S3 ObjectCreated event triggers this).
-		msgBody := fmt.Sprintf(
-			`{"user_id":%q,"upload_id":%q,"s3_key":%q}`,
-			claims.UserID, uploadID, s3Key,
-		)
-		// Inject trace context into SQS message attributes for distributed tracing.
-		sqsAttrs := make(map[string]types.MessageAttributeValue)
-		otel.GetTextMapPropagator().Inject(c.Request.Context(), queue.NewSQSCarrier(sqsAttrs))
-		msgID, err := sqsClient.SendMessage(c.Request.Context(), cfg.AnalysisQueueURL, msgBody, sqsAttrs)
+		presigned, err := presigner.PresignUpload(c.Request.Context(), s3Key, contentType, 15*time.Minute)
 		if err != nil {
-			slog.Error("failed to publish to analysis queue", "error", err)
+			slog.Error("failed to presign upload", "upload_id", uploadID, "error", err)
 			metrics.UploadRequestsTotal.WithLabelValues("error").Inc()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue analysis"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to prepare upload"})
 			return
 		}
 
-		slog.Info("upload created and queued",
+		slog.Info("upload URL created",
 			"user_id", claims.UserID,
 			"upload_id", uploadID,
-			"sqs_message_id", msgID,
 		)
 		metrics.UploadRequestsTotal.WithLabelValues("accepted").Inc()
 
 		c.JSON(http.StatusCreated, gin.H{
-			"upload_id": uploadID,
-			"s3_key":    s3Key,
-			"status":    "pending",
-			"message":   "analysis queued",
+			"upload_id":          uploadID,
+			"s3_key":             s3Key,
+			"status":             "awaiting_upload",
+			"upload_url":         presigned.URL,
+			"upload_method":      presigned.Method,
+			"upload_headers":     gin.H{"Content-Type": contentType},
+			"expires_in_seconds": 900,
 		})
 	}
 }

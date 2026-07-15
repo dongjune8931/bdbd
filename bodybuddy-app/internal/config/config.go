@@ -20,9 +20,9 @@ type Common struct {
 	DBName     string `envconfig:"DB_NAME" required:"true"`
 	DBSSLMode  string `envconfig:"DB_SSL_MODE" default:"disable"`
 
-	RedisAddr     string `envconfig:"REDIS_ADDR" required:"true"`
-	RedisPassword string `envconfig:"REDIS_PASSWORD" default:""`
-	RedisTLSEnabled bool `envconfig:"REDIS_TLS_ENABLED" default:"false"`
+	RedisAddr       string `envconfig:"REDIS_ADDR" required:"true"`
+	RedisPassword   string `envconfig:"REDIS_PASSWORD" default:""`
+	RedisTLSEnabled bool   `envconfig:"REDIS_TLS_ENABLED" default:"false"`
 
 	// SQSEndpoint is used to override the SQS endpoint for localstack.
 	SQSEndpoint          string `envconfig:"SQS_ENDPOINT" default:""`
@@ -31,8 +31,9 @@ type Common struct {
 	NotificationQueueURL string `envconfig:"NOTIFICATION_QUEUE_URL" required:"true"`
 
 	// S3Endpoint is used to override the S3 endpoint for localstack.
-	S3Endpoint string `envconfig:"S3_ENDPOINT" default:""`
-	S3Bucket   string `envconfig:"S3_BUCKET" required:"true"`
+	S3Endpoint        string `envconfig:"S3_ENDPOINT" default:""`
+	S3PresignEndpoint string `envconfig:"S3_PRESIGN_ENDPOINT" default:""`
+	S3Bucket          string `envconfig:"S3_BUCKET" required:"true"`
 
 	JWTSecret string `envconfig:"JWT_SECRET" required:"true"`
 
@@ -64,11 +65,14 @@ type ScoreService struct {
 // AnalysisWorker holds configuration for the analysis-worker.
 type AnalysisWorker struct {
 	Common
-	MetricsPort          int   `envconfig:"METRICS_PORT" default:"9090"`
-	SQSVisibilityTimeout int32 `envconfig:"SQS_VISIBILITY_TIMEOUT" default:"90"`
-	SQSMaxMessages       int32 `envconfig:"SQS_MAX_MESSAGES" default:"10"`
-	SQSWaitTimeSeconds   int32 `envconfig:"SQS_WAIT_TIME_SECONDS" default:"20"`
-	ScoreServiceURL      string `envconfig:"SCORE_SERVICE_URL" required:"true"`
+	MetricsPort             int    `envconfig:"METRICS_PORT" default:"9090"`
+	SQSVisibilityTimeout    int32  `envconfig:"SQS_VISIBILITY_TIMEOUT" default:"90"`
+	SQSMaxMessages          int32  `envconfig:"SQS_MAX_MESSAGES" default:"10"`
+	SQSWaitTimeSeconds      int32  `envconfig:"SQS_WAIT_TIME_SECONDS" default:"20"`
+	ScoreServiceURL         string `envconfig:"SCORE_SERVICE_URL" required:"true"`
+	InferenceServiceURL     string `envconfig:"INFERENCE_SERVICE_URL" default:""`
+	InferenceTimeoutSeconds int    `envconfig:"INFERENCE_TIMEOUT_SECONDS" default:"5"`
+	InferenceFallbackToMock bool   `envconfig:"INFERENCE_FALLBACK_TO_MOCK" default:"true"`
 }
 
 // NotificationWorker holds configuration for the notification-worker.
@@ -76,8 +80,25 @@ type NotificationWorker struct {
 	Common
 	MetricsPort int    `envconfig:"METRICS_PORT" default:"9091"`
 	SESRegion   string `envconfig:"SES_REGION" default:"ap-northeast-2"`
-	SESEndpoint string `envconfig:"SES_ENDPOINT" default:""`  // localstack용
+	SESEndpoint string `envconfig:"SES_ENDPOINT" default:""` // localstack용
 	FromEmail   string `envconfig:"FROM_EMAIL" required:"true"`
+}
+
+// InferenceService holds configuration for the GPU inference service.
+type InferenceService struct {
+	ServiceName string `envconfig:"SERVICE_NAME" required:"true"`
+	LogLevel    string `envconfig:"LOG_LEVEL" default:"info"`
+	HTTPPort    int    `envconfig:"HTTP_PORT" default:"8083"`
+	AWSRegion   string `envconfig:"AWS_REGION" default:"ap-northeast-2"`
+	S3Endpoint  string `envconfig:"S3_ENDPOINT" default:""`
+	S3Bucket    string `envconfig:"S3_BUCKET" required:"true"`
+
+	// OTelEndpoint is the OpenTelemetry Collector gRPC endpoint.
+	OTelEndpoint string `envconfig:"OTEL_EXPORTER_OTLP_ENDPOINT" default:""`
+
+	OCRRuntimeURL            string `envconfig:"OCR_RUNTIME_URL" default:"http://127.0.0.1:8090"`
+	OCRRuntimeTimeoutSeconds int    `envconfig:"OCR_RUNTIME_TIMEOUT_SECONDS" default:"20"`
+	OCRMaxImageBytes         int64  `envconfig:"OCR_MAX_IMAGE_BYTES" default:"10485760"`
 }
 
 // MustLoadUserService loads UserService config or exits.
@@ -115,6 +136,16 @@ func MustLoadNotificationWorker() *NotificationWorker {
 	var cfg NotificationWorker
 	if err := envconfig.Process("", &cfg); err != nil {
 		slog.Error("failed to load notification-worker config", "error", err)
+		os.Exit(1)
+	}
+	return &cfg
+}
+
+// MustLoadInferenceService loads InferenceService config or exits.
+func MustLoadInferenceService() *InferenceService {
+	var cfg InferenceService
+	if err := envconfig.Process("", &cfg); err != nil {
+		slog.Error("failed to load inference-service config", "error", err)
 		os.Exit(1)
 	}
 	return &cfg

@@ -39,3 +39,55 @@ resource "aws_sqs_queue" "notification" {
     Name = var.notification_queue_name
   })
 }
+
+resource "aws_cloudwatch_event_rule" "analysis_object_created" {
+  name        = "${var.analysis_queue_name}-object-created"
+  description = "Routes completed BodyBuddy image uploads to the analysis queue."
+
+  event_pattern = jsonencode({
+    source      = ["aws.s3"]
+    detail-type = ["Object Created"]
+    detail = {
+      bucket = {
+        name = [var.analysis_source_bucket_name]
+      }
+      object = {
+        key = [{ prefix = "uploads/" }]
+      }
+    }
+  })
+
+  tags = var.tags
+}
+
+resource "aws_cloudwatch_event_target" "analysis_queue" {
+  rule      = aws_cloudwatch_event_rule.analysis_object_created.name
+  target_id = "analysis-queue"
+  arn       = aws_sqs_queue.analysis.arn
+}
+
+data "aws_iam_policy_document" "analysis_eventbridge" {
+  statement {
+    sid     = "AllowEventBridgeObjectCreated"
+    effect  = "Allow"
+    actions = ["sqs:SendMessage"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["events.amazonaws.com"]
+    }
+
+    resources = [aws_sqs_queue.analysis.arn]
+
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = [aws_cloudwatch_event_rule.analysis_object_created.arn]
+    }
+  }
+}
+
+resource "aws_sqs_queue_policy" "analysis_eventbridge" {
+  queue_url = aws_sqs_queue.analysis.id
+  policy    = data.aws_iam_policy_document.analysis_eventbridge.json
+}
