@@ -1,4 +1,5 @@
 # BodyBuddy
+<img width="200" height="200"  alt="image (3)" src="https://github.com/user-attachments/assets/754c8479-e336-4787-9afa-a1b7f0446ffd" />
 
 > 인바디 결과를 점수화해 캐릭터를 키우는 헬스 서비스 — AWS EKS 위에서 비동기 MSA를 운영하며 GitOps, 관측성, Spot 비용 최적화, DR을 실제 증거로 구현한 클라우드 인프라 설계를 목표로 합니다
 
