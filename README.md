@@ -7,7 +7,9 @@
 
 ## 메인 아키텍처
 
-<img width="2629" height="2878" alt="bdbd_main_arc drawio" src="https://github.com/user-attachments/assets/a2df3c22-5fbf-450a-89cf-57dc076f994c" />
+<p align="center">
+  <img width="1100" alt="BodyBuddy AWS EKS architecture with Karpenter NodePools" src="./bodybuddy-infra/reports/assets/main-architecture.png" />
+</p>
 
 ### 인바디 업로드 비동기 처리 흐름
 
