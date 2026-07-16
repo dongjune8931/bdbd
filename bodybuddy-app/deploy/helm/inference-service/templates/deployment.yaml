@@ -1,0 +1,142 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "inference-service.fullname" . }}
+  labels:
+    {{- include "inference-service.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  # A drill uses one exclusive GPU, so surge-based rolling updates cannot schedule.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "inference-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "inference-service.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "inference-service.serviceAccountName" . }}
+      terminationGracePeriodSeconds: 120
+      containers:
+        - name: inference-service
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8083
+              protocol: TCP
+          env:
+            - name: SERVICE_NAME
+              value: {{ .Values.config.serviceName | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: HTTP_PORT
+              value: {{ .Values.config.httpPort | quote }}
+            - name: AWS_REGION
+              value: {{ .Values.config.awsRegion | quote }}
+            - name: S3_BUCKET
+              value: {{ .Values.config.s3Bucket | quote }}
+            - name: OCR_RUNTIME_URL
+              value: {{ .Values.config.ocrRuntimeUrl | quote }}
+            - name: OCR_RUNTIME_TIMEOUT_SECONDS
+              value: {{ .Values.config.ocrRuntimeTimeoutSeconds | quote }}
+            - name: OCR_MAX_IMAGE_BYTES
+              value: {{ .Values.config.ocrMaxImageBytes | quote }}
+            {{- if .Values.config.otelEndpoint }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.config.otelEndpoint | quote }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+        - name: ocr-runtime
+          image: "{{ .Values.ocrRuntime.imageRepository }}:{{ .Values.ocrRuntime.imageTag }}"
+          imagePullPolicy: {{ .Values.ocrRuntime.pullPolicy }}
+          ports:
+            - name: runtime-http
+              containerPort: {{ .Values.ocrRuntime.port }}
+              protocol: TCP
+          env:
+            - name: OCR_DEVICE
+              value: {{ .Values.ocrRuntime.device | quote }}
+            - name: OCR_LANGUAGES
+              value: {{ .Values.ocrRuntime.languages | quote }}
+            - name: OCR_MODEL_VERSION
+              value: {{ .Values.ocrRuntime.modelVersion | quote }}
+            - name: OCR_MAX_IMAGE_BYTES
+              value: {{ .Values.ocrRuntime.maxImageBytes | quote }}
+          startupProbe:
+            httpGet:
+              path: /readyz
+              port: runtime-http
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: runtime-http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: runtime-http
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.ocrRuntime.resources | nindent 12 }}
+          volumeMounts:
+            - name: runtime-tmp
+              mountPath: /tmp
+          securityContext:
+            runAsUser: 65532
+            runAsGroup: 65532
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: runtime-tmp
+          emptyDir:
+            sizeLimit: 512Mi
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

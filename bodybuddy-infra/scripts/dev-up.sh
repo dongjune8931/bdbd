@@ -21,8 +21,8 @@ RUN_MIGRATION="${RUN_MIGRATION:-$DIRECT_DEPLOY}"
 RUN_SMOKE="${RUN_SMOKE:-$DIRECT_DEPLOY}"
 SUSPEND_ARGOCD_SYNC="${SUSPEND_ARGOCD_SYNC:-$DIRECT_DEPLOY}"
 
-services=("user-service" "score-service" "analysis-worker" "notification-worker")
-apps=("bodybuddy-app-of-apps" "user-service" "score-service" "analysis-worker" "notification-worker" "karpenter-capacity")
+services=("user-service" "score-service" "analysis-worker" "inference-service" "notification-worker")
+apps=("bodybuddy-app-of-apps" "user-service" "score-service" "analysis-worker" "inference-service" "notification-worker" "nvidia-device-plugin" "dcgm-exporter" "karpenter-capacity")
 
 require() {
   if ! command -v "$1" >/dev/null 2>&1; then

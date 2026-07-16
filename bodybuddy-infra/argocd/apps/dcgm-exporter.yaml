@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dcgm-exporter
+  namespace: bodybuddy-system
+  labels:
+    app.kubernetes.io/part-of: bodybuddy
+    app.kubernetes.io/component: observability
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: bodybuddy
+  source:
+    repoURL: https://nvidia.github.io/dcgm-exporter/helm-charts
+    chart: dcgm-exporter
+    targetRevision: 4.8.2
+    helm:
+      values: |
+        nodeSelector:
+          workload-type: gpu
+        tolerations:
+          - key: workload-type
+            operator: Equal
+            value: gpu
+            effect: NoSchedule
+        serviceMonitor:
+          enabled: true
+          interval: 15s
+          scrapeTimeout: 10s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

@@ -22,6 +22,8 @@ import (
 type Metrics struct {
 	HTTPRequestsTotal                *prometheus.CounterVec
 	HTTPRequestDuration              *prometheus.HistogramVec
+	InferenceRequestsTotal           *prometheus.CounterVec
+	InferenceRequestDuration         *prometheus.HistogramVec
 	SQSMessagesProcessed             *prometheus.CounterVec
 	SQSMessageDuration               *prometheus.HistogramVec
 	UploadRequestsTotal              *prometheus.CounterVec
@@ -60,6 +62,27 @@ func NewMetrics(serviceName string, reg *prometheus.Registry) *Metrics {
 				Buckets:     prometheus.DefBuckets,
 			},
 			[]string{"method", "path"},
+		),
+		InferenceRequestsTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Namespace:   "bodybuddy",
+				Subsystem:   "inference",
+				Name:        "requests_total",
+				Help:        "Total number of inference requests handled or attempted by the service.",
+				ConstLabels: prometheus.Labels{"service": serviceName},
+			},
+			[]string{"result", "mode"},
+		),
+		InferenceRequestDuration: prometheus.NewHistogramVec(
+			prometheus.HistogramOpts{
+				Namespace:   "bodybuddy",
+				Subsystem:   "inference",
+				Name:        "request_duration_seconds",
+				Help:        "Latency of inference requests in seconds.",
+				ConstLabels: prometheus.Labels{"service": serviceName},
+				Buckets:     []float64{0.05, 0.1, 0.25, 0.5, 1, 2, 3, 5, 8},
+			},
+			[]string{"mode"},
 		),
 		SQSMessagesProcessed: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
@@ -194,6 +217,8 @@ func NewMetrics(serviceName string, reg *prometheus.Registry) *Metrics {
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 		m.HTTPRequestsTotal,
 		m.HTTPRequestDuration,
+		m.InferenceRequestsTotal,
+		m.InferenceRequestDuration,
 		m.SQSMessagesProcessed,
 		m.SQSMessageDuration,
 		m.UploadRequestsTotal,

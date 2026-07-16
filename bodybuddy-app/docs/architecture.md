@@ -12,7 +12,8 @@ flowchart LR
     user["user-service\nAuth, Upload API"]
     s3["S3\nInBody image bucket"]
     aq["SQS\nanalysis queue"]
-    analysis["analysis-worker\nMock OCR, score calculation"]
+    analysis["analysis-worker\nQueue orchestration"]
+    inference["inference-service\nS3 image, EasyOCR runtime"]
     score["score-service\nCharacter, Ranking"]
     redis["ElastiCache Redis\nRanking cache"]
     rds["RDS PostgreSQL\nUsers, scores, history"]
@@ -24,6 +25,7 @@ flowchart LR
     user -->|"object key"| s3
     user -->|"enqueue"| aq
     aq --> analysis
+    analysis -->|"internal HTTP inference"| inference
     analysis -->|"score update"| score
     score --> redis
     score --> rds
@@ -39,7 +41,8 @@ flowchart LR
 |---|---|---|---|
 | `user-service` | Sync API | Auth, upload request, SQS enqueue | `critical-pool`, on-demand |
 | `score-service` | Sync API | Score update, ranking read, character state | `critical-pool`, on-demand |
-| `analysis-worker` | Async worker | Mock OCR, score calculation, retryable processing | `batch-pool`, spot |
+| `analysis-worker` | Async worker | SQS polling, retry, fallback orchestration | `batch-pool`, spot |
+| `inference-service` | Internal API | S3 image loading, EasyOCR field extraction | `gpu-pool`, drill-only on-demand |
 | `notification-worker` | Async worker | Notification queue consumption | `batch-pool`, spot |
 
 API는 사용자 요청 경로에 있으므로 on-demand 노드에 고정했다. Worker는 SQS 기반으로 재시도가 가능하므로 spot 노드에 배치했다.
@@ -79,11 +82,18 @@ flowchart TB
         notification["notification-worker"]
     end
 
+    subgraph gpu["gpu-pool / on-demand GPU"]
+        inference["inference-service"]
+    end
+
     user --> score
+    analysis --> inference
     analysis --> score
 ```
 
-Spot 노드를 drain했을 때 `analysis-worker`는 처리 중 메시지를 re-queue했고, 새 spot 노드에서 다시 처리했다. 이 흐름은 SQS visibility timeout과 worker graceful shutdown이 함께 있어야 안전하다.
+Spot 노드를 drain했을 때 `analysis-worker`는 처리 중 메시지를 re-queue했고, 새 spot 노드에서 다시 처리했다. 추론 경로는 별도 `gpu-pool`로 분리되어 있어 batch worker와 GPU inference capacity를 독립적으로 설명할 수 있다.
+
+GPU 비용을 상시 발생시키지 않기 위해 `inference-service` 기본 replica는 0이다. 검증 시 `values.gpu-drill.yaml`로 1개를 실행하고, 종료 후 다시 0으로 내려 Karpenter가 빈 `g4dn.xlarge` 노드를 정리하게 한다.
 
 ## Observability
 
@@ -92,6 +102,7 @@ Spot 노드를 drain했을 때 `analysis-worker`는 처리 중 메시지를 re-q
 | Metrics | Prometheus, Grafana | RED metrics, HPA, infrastructure 상태 확인 |
 | Logs | CloudWatch Logs | AWS-native 로그 저장, 운영 부담 감소 |
 | Traces | OpenTelemetry Collector, Tempo | upload to worker to score 경로만 집중 추적 |
+| GPU Metrics | NVIDIA device plugin, DCGM exporter | GPU utilization, framebuffer memory, inference workload 상태 확인 |
 | Cost | KubeCost | namespace/workload 비용과 spot 절감 근거 확보 |
 
 모든 경로를 과하게 추적하지 않고, 비동기 업로드 경로를 중심으로 계측했다.

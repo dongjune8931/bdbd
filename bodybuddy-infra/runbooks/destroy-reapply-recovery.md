@@ -437,10 +437,28 @@ kubectl describe pod -n bodybuddy-system -l app.kubernetes.io/name=prometheus-op
 
 ### destroy 전
 
-1. ALB가 아직 살아 있으면 먼저 확인
-2. 필요한 값/스크린샷/리포트 백업
-3. 현재 `terraform output` 저장
-4. 필요하면 `kubectl get applications -A`, `kubectl get nodes`, `kubectl get ingress -A` 캡처
+1. 필요한 값/스크린샷/리포트 백업
+2. 현재 `terraform output` 저장
+3. 필요하면 `kubectl get applications -A`, `kubectl get nodes`, `kubectl get ingress -A` 캡처
+4. 아래 안전 확인 문자열과 함께 dev teardown 스크립트 실행
+
+```bash
+CONFIRM_DESTROY=bodybuddy-dev \
+AWS_PROFILE=terraform-bodybuddy \
+bodybuddy-infra/scripts/dev-down.sh
+```
+
+`dev-down.sh`는 Terraform보다 먼저 다음 순서로 정리한다.
+
+1. inference replica를 0으로 축소
+2. Ingress 삭제 후 AWS Load Balancer Controller가 ALB/ENI를 제거할 때까지 대기
+3. Karpenter NodeClaim 삭제와 EC2 종료 대기
+4. dev ECR 이미지 삭제
+5. S3 Governance Object Lock 버전과 delete marker를 bypass 권한으로 삭제
+6. `terraform destroy`
+7. Terraform state 0건과 활성 BodyBuddy EC2 0대 검증
+
+이 순서를 생략하면 Terraform state 밖에서 controller가 만든 ALB와 Karpenter EC2가 VPC 삭제를 막거나, ECR/S3가 `RepositoryNotEmpty`·`BucketNotEmpty`로 destroy를 중단시킬 수 있다.
 
 ### reapply 후
 

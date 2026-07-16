@@ -24,6 +24,10 @@ override.tf.json
 # Go local cache
 bodybuddy-app/.gocache/
 
+# Python local cache
+**/__pycache__/
+*.pyc
+
 # Temporary working files
 tmp/
 .tmp/

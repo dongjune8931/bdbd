@@ -57,11 +57,12 @@ module "s3_auto_recovery" {
 module "sqs" {
   source = "../../modules/sqs"
 
-  environment             = var.environment
-  analysis_queue_name     = "${local.project}-${var.environment}-${var.sqs_queue_names.analysis}-queue"
-  notification_queue_name = "${local.project}-${var.environment}-${var.sqs_queue_names.notification}-queue"
-  max_receive_count       = 3
-  tags                    = local.common_tags
+  environment                 = var.environment
+  analysis_queue_name         = "${local.project}-${var.environment}-${var.sqs_queue_names.analysis}-queue"
+  analysis_source_bucket_name = module.s3.bucket_name
+  notification_queue_name     = "${local.project}-${var.environment}-${var.sqs_queue_names.notification}-queue"
+  max_receive_count           = 3
+  tags                        = local.common_tags
 }
 
 module "ecr" {
@@ -548,6 +549,28 @@ data "aws_iam_policy_document" "analysis_worker_irsa" {
   }
 }
 
+data "aws_iam_policy_document" "inference_service_irsa" {
+  statement {
+    sid     = "ReadInbodyUploads"
+    effect  = "Allow"
+    actions = ["s3:GetObject"]
+    resources = [
+      "${module.s3.bucket_arn}/uploads/*",
+    ]
+  }
+
+  dynamic "statement" {
+    for_each = var.kms_key_arn == null ? [] : [var.kms_key_arn]
+
+    content {
+      sid       = "DecryptInbodyUploads"
+      effect    = "Allow"
+      actions   = ["kms:Decrypt"]
+      resources = [statement.value]
+    }
+  }
+}
+
 data "aws_iam_policy_document" "notification_worker_irsa" {
   statement {
     sid    = "NotificationQueueAccess"
@@ -652,6 +675,19 @@ module "analysis_worker_irsa" {
   oidc_provider_arn    = module.eks.oidc_provider_arn
   namespace            = local.app_namespace
   service_account_name = "analysis-worker"
+  tags                 = local.common_tags
+}
+
+module "inference_service_irsa" {
+  source = "../../modules/iam-irsa"
+
+  role_name            = "${local.name_prefix}-inference-service-irsa"
+  policy_name          = "${local.name_prefix}-inference-service-irsa"
+  policy_json          = data.aws_iam_policy_document.inference_service_irsa.json
+  oidc_provider        = module.eks.oidc_provider
+  oidc_provider_arn    = module.eks.oidc_provider_arn
+  namespace            = local.app_namespace
+  service_account_name = "inference-service"
   tags                 = local.common_tags
 }
 

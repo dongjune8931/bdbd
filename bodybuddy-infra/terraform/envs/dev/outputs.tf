@@ -88,6 +88,11 @@ output "analysis_worker_irsa_role_arn" {
   value       = module.analysis_worker_irsa.role_arn
 }
 
+output "inference_service_irsa_role_arn" {
+  description = "IAM role ARN for the inference-service service account."
+  value       = module.inference_service_irsa.role_arn
+}
+
 output "notification_worker_irsa_role_arn" {
   description = "IAM role ARN for the notification-worker service account."
   value       = module.notification_worker_irsa.role_arn

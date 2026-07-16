@@ -12,6 +12,8 @@ spec:
     - https://argoproj.github.io/argo-helm
     - https://kubecost.github.io/cost-analyzer/
     - https://kubernetes-sigs.github.io/metrics-server/
+    - https://nvidia.github.io/k8s-device-plugin
+    - https://nvidia.github.io/dcgm-exporter/helm-charts
   destinations:
     - namespace: bodybuddy
       server: https://kubernetes.default.svc

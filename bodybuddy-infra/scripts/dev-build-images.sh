@@ -12,7 +12,7 @@ IMAGE_TAG="${IMAGE_TAG:-dev-$(date +%Y%m%d%H%M%S)}"
 GOOS_TARGET="${GOOS_TARGET:-linux}"
 GOARCH_TARGET="${GOARCH_TARGET:-amd64}"
 
-services=("user-service" "score-service" "analysis-worker" "notification-worker")
+services=("user-service" "score-service" "analysis-worker" "inference-service" "notification-worker")
 
 require() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -87,5 +87,14 @@ for service in "${services[@]}"; do
     "$context_dir"
 done
 
-echo "Built and pushed all images with tag: $IMAGE_TAG"
+ocr_runtime_repository_url="$(jq -r '.ecr_repository_urls.value["ocr-runtime"]' <<<"$tf_outputs")"
+echo "Building GPU OCR runtime for linux/amd64"
+docker buildx build \
+  --platform linux/amd64 \
+  -f "$APP_DIR/inference-runtime/Dockerfile.gpu" \
+  -t "$ocr_runtime_repository_url:$IMAGE_TAG" \
+  -t "$ocr_runtime_repository_url:latest" \
+  --push \
+  "$APP_DIR"
 
+echo "Built and pushed all images with tag: $IMAGE_TAG"
