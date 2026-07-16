@@ -1,7 +1,9 @@
 # BodyBuddy
-<img width="200" height="200"  alt="image (3)" src="https://github.com/user-attachments/assets/754c8479-e336-4787-9afa-a1b7f0446ffd" />
+<p align="center">
+  <img width="200" height="200" alt="BodyBuddy logo" src="https://github.com/user-attachments/assets/754c8479-e336-4787-9afa-a1b7f0446ffd" />
+</p>
 
-> 인바디 결과를 점수화해 캐릭터를 키우는 헬스 서비스 — AWS EKS 위에서 비동기 MSA를 운영하며 GitOps, 관측성, Spot 비용 최적화, DR을 실제 증거로 구현한 클라우드 인프라 설계를 목표로 합니다
+> 인바디 결과를 점수화해 캐릭터를 키우는 헬스 서비스 — AWS EKS 위에서 비동기 MSA를 운영하며 GitOps, 관측성, progressive delivery, GPU 추론 워크로드, Spot 비용 최적화, DR을 실제 증거로 검증한 클라우드 인프라 프로젝트입니다
 
 ## 메인 아키텍처
 
@@ -9,18 +11,18 @@
 
 ### 인바디 업로드 비동기 처리 흐름
 
-<img width="1072" height="747" alt="inbody_upload_diagram" src="https://github.com/user-attachments/assets/907cc93f-2cad-4ffd-a95f-e468da904ad0" />
+<img width="1100" alt="BodyBuddy GPU OCR asynchronous upload pipeline" src="./bodybuddy-infra/reports/assets/inbody-upload-pipeline.png" />
 
-### 서비스 흐름
-<img width="1472" height="237" alt="스크린샷 2026-05-22 오후 5 45 22" src="https://github.com/user-attachments/assets/559b4e39-1efa-4e01-b654-73b9eb94607c" />
+<p align="center"><em>user-service는 presigned URL만 발급하고, 실제 이미지 PUT은 클라이언트가 S3에 직접 수행한다.</em></p>
 
-Runtime placement:
+### 워크로드 배치
 
 | Workload | NodePool | Capacity | Reason |
 |---|---|---|---|
 | `user-service` | `critical-pool` | on-demand | user-facing API, lower latency sensitivity |
 | `score-service` | `critical-pool` | on-demand | ranking/read API, HPA target |
 | `analysis-worker` | `batch-pool` | spot | async processing, retryable with SQS |
+| `inference-service` | `gpu-pool` | on-demand GPU | EasyOCR/CUDA 추론, CPU 워크로드와 장애·비용 격리 |
 | `notification-worker` | `batch-pool` | spot | async notification, delay-tolerant |
 
 ---
@@ -29,12 +31,14 @@ Runtime placement:
 
 | 영역 | 구현 내용 | 검증 증거 |
 |---|---|---|
-| MSA on EKS | Go 기반 API 2개와 worker 2개를 EKS에 배포 | ArgoCD 전체 `Synced Healthy`, 서비스별 readiness 확인 |
+| MSA on EKS | Go 기반 API·worker·inference gateway 5개를 EKS에 배포 | ArgoCD 전체 `Synced Healthy`, 서비스별 readiness 확인 |
 | GitOps | ArgoCD App-of-Apps로 Helm chart 관리 | Git 변경 후 자동 sync, self-heal 운영 |
-| 비동기 처리 | `user-service -> SQS -> analysis-worker -> score-service` 흐름 | 업로드 후 score 반영, worker 로그 |
+| 비동기 처리 | `S3 -> SQS -> analysis-worker -> inference-service -> score-service` 흐름 | 실제 이미지 업로드 후 OCR·score 반영, queue/DLQ `0` |
+| GPU 추론 운영 | EasyOCR runtime을 GPU 전용 NodePool에 격리하고 scale-to-zero 적용 | Tesla T4 실제 추론, GPU 사용률 최대 `81%`, 노드 자동 회수 |
+| Progressive Delivery | Argo Rollouts와 Prometheus 분석 게이트로 canary 배포 | 정상 버전 자동 승격, p95 기준 위반 버전 자동 abort |
 | Spot 운영 | API는 on-demand, worker는 Spot 노드로 분리 | Spot 노드 drain, re-queue, 새 worker 재처리 |
 | DR | S3 자동 복구, RDS PITR, 복구 런북 | Lambda 로그, RDS restore, RTO/RPO 매트릭스 |
-| 부하 테스트 / 오토스케일링 | OTel trace, Grafana, KEDA/HPA 기반 병목 관찰 | queue backlog `8,816`, worker `1 -> 12 replicas`, trace/메트릭 캡처 |
+| 관측성 / 오토스케일링 | OTel·Prometheus·Grafana·DCGM과 KEDA/HPA로 병목 관찰 | queue backlog `8,816`, worker `1 -> 12`, 8-span GPU trace |
 
 ---
 
@@ -90,30 +94,68 @@ S3 객체 삭제 이벤트는 EventBridge와 Lambda로 연결하고, 최신 dele
 
 ## 관측성
 
-kube-prometheus-stack으로 Prometheus + Grafana를 올리고, CloudWatch 데이터소스를 연결해 서비스 RED 메트릭과 DR 지표를 단일 화면에서 확인할 수 있도록 구성했다.
+kube-prometheus-stack으로 Prometheus + Grafana를 올리고 CloudWatch 데이터소스를 연결했다. 서비스 RED 메트릭과 DR 지표뿐 아니라 DCGM exporter의 GPU 사용률·메모리, inference 요청 수·지연을 같은 시간축에서 확인할 수 있도록 구성했다.
 
 <img width="700" alt="01-bodybuddy-service-overview-dashboard" src="https://github.com/user-attachments/assets/5622e182-e644-4dfa-9466-8ccf1b92f7d8" />
 
 ### OpenTelemetry Critical Path Trace
 
-OpenTelemetry와 Tempo를 이용해 업로드 요청 이후 `user-service -> analysis-worker -> score-service`로 이어지는 크리티컬 패스를 실제 trace로 검증했다. 비동기 워커 처리 구간과 내부 `HTTP POST`, 그리고 `score-service`의 server span까지 한 trace 안에서 연결되는 것을 확인했다.
+OpenTelemetry와 Tempo를 이용해 `analysis-worker -> inference-service -> OCR runtime -> score-service`로 이어지는 분석 크리티컬 패스를 실제 trace로 검증했다. S3 `ObjectCreated` 이벤트는 upstream trace context를 전달하지 않기 때문에, 비동기 소비 구간의 trace root는 `analysis-worker`에서 시작한다. 따라서 `user-service`까지 하나의 연속 trace로 보인다고 과장하지 않고, 이벤트 전후를 별도 trace와 비즈니스 식별자로 연결한다.
 
 #### 1. Node Graph
 
 <img width="995" height="305" alt="스크린샷 2026-05-21 오후 9 05 19" src="https://github.com/user-attachments/assets/9d145f8b-faac-4e38-b6a7-3c200b2dd2fb" />
 
-Node graph는 서비스 간 호출 관계를 한 눈에 보여준다. 업로드 요청이 `user-service`에서 시작되고, `analysis-worker`를 거쳐 `score-service`의 내부 API로 연결되는 전체 흐름을 서비스 단위로 설명할 때 사용한다.
+Node graph는 `analysis-worker`가 GPU 추론을 위해 `inference-service`를 호출하고, 결과를 `score-service`에 반영하는 관계를 서비스 단위로 보여준다. 비동기 이벤트 이후의 내부 호출 경계가 올바르게 전파되는지 확인하는 데 사용한다.
 
 #### 2. Waterfall Trace
 
 <img width="1168" height="382" alt="스크린샷 2026-05-21 오후 9 05 34" src="https://github.com/user-attachments/assets/ff3c4bf8-eb15-4569-9ad3-ff3f0e4c9e58" />
 
-Waterfall 화면에서는 전체 요청 시간 중 어느 구간이 오래 걸렸는지 확인할 수 있다. 현재 구현에서는 `analysis-worker.processMessage` span이 가장 긴 구간으로 나타나며, Mock OCR 지연과 비동기 분석 비용이 trace 상에서 직접 드러난다.
+Waterfall 화면에서는 전체 처리 시간 `916.6ms` 중 `inference-service`가 `850.6ms`, OCR runtime 호출이 `704.7ms`를 차지한 것을 확인했다. 반면 `score-service` 내부 처리는 `47.2ms`, DB 반영은 `4.9ms`로 나타나 병목이 DB가 아니라 모델 추론 경로임을 분해해 설명할 수 있었다.
 
 #### 3. Span Details
 
 <img width="1174" height="884" alt="스크린샷 2026-05-21 오후 9 05 54" src="https://github.com/user-attachments/assets/12f701bd-12bb-4fa5-94d1-0a13a69809c9" />
-Span detail에서는 `analysis-worker`의 outbound `HTTP POST`와 `score-service /internal/v1/score` server span을 함께 확인할 수 있다. 이를 통해 worker가 실제로 `score-service.bodybuddy.svc.cluster.local`로 내부 호출을 수행했고, 최종 서비스까지 trace가 전파되었음을 증명한다.
+Span detail에서는 worker의 inference/score outbound 요청, `inference-service /internal/v1/inference`, OCR runtime 호출, `score-service /internal/v1/score`, DB 저장과 notification enqueue까지 총 8개 span을 확인했다. 서비스 전체 지연을 애플리케이션·모델·DB·메시징 구간으로 나눠 판단할 수 있도록 구성했다.
+
+---
+
+## GPU 추론 워크로드
+
+OCR을 `analysis-worker` 내부의 mock 처리로 남겨두지 않고, Go 기반 `inference-service`와 Python EasyOCR runtime으로 분리했다. API와 batch worker가 사용하는 CPU 노드와 GPU 추론 노드의 스케줄링·장애·비용을 격리하고, 모델 학습보다 **GPU 워크로드를 Kubernetes에서 안전하게 운영하고 관측하는 과정**에 초점을 맞췄다.
+
+| 항목 | 구현 및 실측 결과 |
+|---|---|
+| GPU 배치 | Karpenter `gpu-pool`, `g4dn.xlarge` on-demand, Tesla T4 |
+| 스케줄링 | `workload-type=gpu` taint/toleration과 `nvidia.com/gpu: 1` 요청 |
+| 실제 추론 | EasyOCR 1.7.2 한국어·영어 모델, OCR model duration `435ms` |
+| End-to-end | analysis 전체 `916.6ms`, inference span `850.6ms`, score `74` 반영 |
+| GPU 관측성 | 성공 `46건`, 실패 `0건`, 최대 사용률 `81%`, 메모리 `1,284MiB` |
+| 장애 격리 | inference 연결 실패 시 deterministic mock fallback, queue/DLQ `0` |
+| 비용 회수 | 평상시 replica `0`, scale-down 후 약 5분 만에 GPU 노드 회수 시작 |
+
+GPU 서비스 장애를 숨기지 않고 로그와 메트릭에는 failure/fallback으로 남기되, 비동기 파이프라인 전체가 중단되거나 메시지가 DLQ로 이동하지 않도록 설계했다. 드릴 때만 replica를 `1`로 올리고 종료 직후 `0`으로 내려, 고비용 GPU 노드가 상시 실행되지 않게 했다.
+
+- [GPU Inference Workload MVP Report](./bodybuddy-infra/reports/gpu-inference-mvp.md)
+
+---
+
+## Release Engineering
+
+`score-service`는 단순 rolling update 대신 Argo Rollouts canary 전략을 선택했다. 배포 성공을 Pod `Running` 상태가 아니라 실제 `/api/v1/ranking` 요청의 오류율과 p95 지연이 기준을 통과한 상태로 정의하고, Prometheus `AnalysisTemplate`을 승격 게이트로 사용했다.
+
+| 단계 | 판단 기준 | 실제 검증 |
+|---|---|---|
+| `25%` canary | 30초 pause 후 error rate·p95 분석 | error `0`, p95 약 `4.91ms`, `Successful` |
+| `50%` canary | 동일 분석을 한 번 더 수행 | error `0`, p95 약 `4.8ms`, `Successful` |
+| 정상 승격 | 두 분석 게이트 통과 | Rollout `Healthy`, stable/current hash 일치 |
+| 실패 주입 | p95 기준을 의도적으로 `0.1ms`로 강화 | p95 `4.75ms`, AnalysisRun `Failed` |
+| 자동 중단 | 분석 실패 시 신규 버전 승격 금지 | Rollout `Degraded / abort`, stable 버전 계속 serving |
+
+ArgoCD는 desired state 동기화를, Argo Rollouts는 배포 단계와 품질 판단을 담당하도록 책임을 분리했다. 기존 HPA도 Rollout 리소스를 scale target으로 전환해 오토스케일링과 progressive delivery가 함께 동작하도록 구성했다.
+
+- [Release Engineering with Argo Rollouts](./bodybuddy-infra/reports/release-engineering-rollouts.md)
 
 ---
 
@@ -143,6 +185,10 @@ LitmusChaos는 BodyBuddy에서 상시 플랫폼으로 운영하지 않고, **dev
 
 ### Evidence
 
+<details>
+<summary><strong>Drill 1 캡처 펼쳐보기</strong></summary>
+<br />
+
 <div align="center">
   <img src="https://github.com/user-attachments/assets/08be2f0c-06da-44ca-9fa5-4ab0b83309ae" width="32%" alt="Litmus ChaosResult Pass" />
   &nbsp;
@@ -151,6 +197,8 @@ LitmusChaos는 BodyBuddy에서 상시 플랫폼으로 운영하지 않고, **dev
   <img src="https://github.com/user-attachments/assets/8e3390e8-42f9-4bcf-9c1b-89823daa75b4" width="32%" alt="analysis-worker ready replicas" />
 </div>
 <p align="center"><em>ChaosResult Pass &nbsp;&nbsp;&nbsp; Pod 재생성 &nbsp;&nbsp;&nbsp; Ready Replicas 1 -> 0 -> 1</em></p>
+
+</details>
 
 이 실험은 “Pod가 다시 떴다” 수준이 아니라, **장애 주입 -> 가용성 하락 -> 복구 -> 처리 재개**를 Grafana와 Litmus 결과로 함께 확인했다는 점에서 의미가 있다. 이후 동일한 방식으로 `score-service pod-delete`, worker-to-service latency 같은 drill도 확장할 수 있다.
 
@@ -179,6 +227,10 @@ LitmusChaos는 BodyBuddy에서 상시 플랫폼으로 운영하지 않고, **dev
 
 #### Evidence
 
+<details>
+<summary><strong>Drill 2 캡처 펼쳐보기</strong></summary>
+<br />
+
 <div align="center">
   <img src="https://github.com/user-attachments/assets/35899579-ed61-41b3-8cd9-c67744eb095e" width="32%" alt="score-service ChaosResult Pass" />
   &nbsp;
@@ -187,6 +239,8 @@ LitmusChaos는 BodyBuddy에서 상시 플랫폼으로 운영하지 않고, **dev
   <img src="https://github.com/user-attachments/assets/9ca32513-0e12-45b6-a3d8-afeb8b376388" width="32%" alt="score-service ready replicas" />
 </div>
 <p align="center"><em>ChaosResult Pass &nbsp;&nbsp;&nbsp; Pod 재생성 &nbsp;&nbsp;&nbsp; Ready Replicas 1 -> 0 -> 1</em></p>
+
+</details>
 
 이 실험은 dramatic한 latency 변화보다, **동기 서비스 장애 시에도 Kubernetes 기본 복구 메커니즘이 예상대로 동작한다**는 운영 증거를 남기는 데 의미가 있다. 특히 1차 `analysis-worker` drill과 함께 보면, 비동기 worker와 동기 API를 각각 다른 장애 모델로 검증했다는 점에서 스토리가 더 탄탄해진다.
 
@@ -216,6 +270,10 @@ LitmusChaos는 BodyBuddy에서 상시 플랫폼으로 운영하지 않고, **dev
 
 #### Evidence
 
+<details>
+<summary><strong>Drill 3 캡처 펼쳐보기</strong></summary>
+<br />
+
 <div align="center">
   <img src="https://github.com/user-attachments/assets/c7c9745e-9469-425c-afc1-ad083b78e45e" width="48%" alt="network latency trace list" />
   &nbsp;
@@ -229,6 +287,8 @@ LitmusChaos는 BodyBuddy에서 상시 플랫폼으로 운영하지 않고, **dev
   <img src="https://github.com/user-attachments/assets/5ad8b793-c796-4127-848b-4b04e9abf83a" width="48%" alt="network latency chaosresult pass" />
 </div>
 <p align="center"><em>`HTTP POST` 구간 지연이 드러난 waterfall &nbsp;&nbsp;&nbsp; Litmus ChaosResult Pass</em></p>
+
+</details>
 
 이번 3차 실험의 핵심은 “느려졌다”가 아니라, **어디가 느려졌는지 설명할 수 있었다**는 점이다. `HTTP POST 4.32s`와 `score-service /internal/v1/score 121.33ms`가 동시에 보였기 때문에, 내부 서비스 처리보다 네트워크 지연이 병목이라는 해석을 명확히 뒷받침할 수 있었다.
 
@@ -288,11 +348,14 @@ BodyBuddy의 인프라는 "Terraform이 AWS 리소스를 만든다" 수준이 �
 - **트래픽 특성 기반 배치**
   - API는 `critical-pool / on-demand`
   - worker는 `batch-pool / spot`
+  - GPU inference는 `gpu-pool / g4dn.xlarge on-demand`, 평상시 scale-to-zero
 - **최소 권한**
   - 서비스별 IRSA role 분리
-  - `analysis-worker`, `score-service`, `keda-operator` 권한을 별도로 관리
+  - `analysis-worker`, `inference-service`, `score-service`, `keda-operator` 권한을 별도로 관리
 - **운영성과 비용**
-  - S3 Gateway Endpoint, Spot node pool, destroy/recreate 가능한 dev 구조
+  - S3 Gateway Endpoint, Spot node pool, GPU drill-only 운영, destroy/recreate 가능한 dev 구조
+- **배포 안전성**
+  - ArgoCD는 선언 상태 동기화, Argo Rollouts는 canary 단계와 Prometheus 품질 게이트 담당
 - **복구 가능성**
   - SQS 재처리, ArgoCD self-heal, S3 자동 복구, RDS PITR을 IaC 범위에 포함
 
@@ -306,7 +369,7 @@ BodyBuddy의 인프라는 "Terraform이 AWS 리소스를 만든다" 수준이 �
 
 ## 비용 최적화
 
-KubeCost로 클러스터 비용을 가시화하고, Karpenter consolidation으로 미사용 노드를 자동 정리해 절감 기회를 식별했다.
+KubeCost로 클러스터 비용을 가시화하고, Karpenter consolidation으로 미사용 노드를 자동 정리해 절감 기회를 식별했다. Batch worker는 Spot을 우선 사용하고, GPU inference는 평상시 replica `0`을 유지한다. GPU 드릴 종료 후 `consolidateAfter: 5m` 설정에 따라 약 5분 만에 빈 `g4dn.xlarge` 노드 회수가 시작되는 것까지 확인했다.
 
 <img width="1155" height="1127" alt="kubecost2" src="https://github.com/user-attachments/assets/5a5b2d06-770b-4347-91ca-081b1d9a12dc" />
 
@@ -316,16 +379,17 @@ KubeCost로 클러스터 비용을 가시화하고, Karpenter consolidation으�
 
 | 분류 | 기술 |
 |---|---|
-| **언어 / 프레임워크** | Go 1.24, Gin, pgx/v5, go-redis/v9, aws-sdk-go-v2 |
+| **언어 / 프레임워크** | Go (core 1.24 / inference build 1.25), Gin, pgx/v5, go-redis/v9, aws-sdk-go-v2, Python 3.11 |
 | **로깅 / 메트릭 / 트레이싱** | slog (JSON), Prometheus, OpenTelemetry (OTLP), Grafana Tempo |
-| **컨테이너** | Docker (멀티스테이지), distroless/static-debian12:nonroot |
-| **오케스트레이션** | AWS EKS 1.33, Karpenter v1.x (critical-pool on-demand / batch-pool Spot) |
-| **GitOps / CI-CD** | ArgoCD (App-of-Apps), GitHub Actions (OIDC → ECR push) |
+| **컨테이너** | Docker (멀티스테이지), distroless/static-debian12:nonroot, CUDA/PyTorch OCR runtime |
+| **오케스트레이션** | AWS EKS 1.33, Karpenter v1.x (critical on-demand / batch Spot / GPU on-demand) |
+| **GPU 추론** | NVIDIA Tesla T4, EasyOCR 1.7.2, PyTorch CUDA, NVIDIA device plugin, DCGM exporter |
+| **GitOps / CI-CD** | ArgoCD (App-of-Apps), Argo Rollouts, GitHub Actions (OIDC → ECR push) |
 | **IaC** | Terraform ~>1.9 (VPC, EKS, Karpenter, RDS, ElastiCache, S3, SQS, Lambda, ECR, IAM/IRSA) |
 | **데이터 스토어** | RDS PostgreSQL 15 (PITR, SSE), ElastiCache Redis 7 (TLS, Sorted Set 랭킹) |
 | **메시징** | SQS (analysis-queue / notification-queue + DLQ), EventBridge |
 | **보안** | IRSA (서비스별 최소 권한), AWS Secrets Manager, SSE-KMS, S3 Object Lock |
-| **관측성 스택** | kube-prometheus-stack, OTel Collector, Grafana Tempo, KubeCost |
+| **관측성 스택** | kube-prometheus-stack, OTel Collector, Grafana Tempo, DCGM exporter, KubeCost |
 | **부하 테스트** | k6 (upload-burst / ranking-read 시나리오) |
 | **이메일** | AWS SES |
 
@@ -335,9 +399,10 @@ KubeCost로 클러스터 비용을 가시화하고, Karpenter consolidation으�
 
 ```text
 bodybuddy-app/
-  cmd/                 # Go service entrypoints
+  cmd/                 # 5개 Go service entrypoints
   internal/            # auth, db, cache, queue, domain, observability
   deploy/helm/         # service Helm charts
+  inference-runtime/   # EasyOCR CPU/CUDA runtime
   test/load/           # k6 load test scripts
   migrations/          # PostgreSQL schema
 
