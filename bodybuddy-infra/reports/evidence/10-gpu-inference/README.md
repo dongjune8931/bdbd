@@ -4,11 +4,11 @@
 
 | 파일 | 증명할 내용 |
 |---|---|
-| `01-node-placement.png` | `g4dn.xlarge` on-demand GPU 노드와 inference Pod 배치 |
-| `02-nvidia-runtime.png` | Tesla T4/CUDA 인식과 EasyOCR model ready |
+| `01-node-placement.png` | `g4dn.xlarge` on-demand GPU 노드와 inference Pod 배치 (수집 완료) |
+| `02-nvidia-runtime.png` | Tesla T4/CUDA 인식과 EasyOCR model ready (수집 완료) |
 | `03-e2e-worker-dlq.png` | GPU OCR 성공, score 반영, queue/DLQ 0건 |
-| `04-gpu-dashboard.png` | GPU utilization 81%, memory 1,284 MiB, 추론 시계열 |
-| `05-tempo-trace.png` | worker -> inference -> OCR -> score 지연 분해 |
+| `04-gpu-dashboard.png` | GPU utilization 81%, memory 1,284 MiB, 추론 시계열 (수집 완료) |
+| `05-tempo-trace.png` | worker -> inference -> OCR -> score 지연 분해 (수집 완료) |
 | `06-fallback.png` | inference 장애 시 deterministic fallback 성공 |
 | `07-scale-to-zero.png` | inference replica 0과 Karpenter GPU 노드 회수 |
 

@@ -96,6 +96,14 @@ user-service -> presigned PUT -> S3 ObjectCreated -> SQS analysis queue
 - EasyOCR startup 로그에서 `accelerator=Tesla T4`, `model=easyocr-1.7.2-ko-en`을 확인했다.
 - 최초 CUDA OCR 이미지 pull은 약 95.7초가 걸렸다. 약 3.66GB 모델 이미지가 GPU cold start에서 무시할 수 없는 지연 요소임을 확인했다.
 
+<p align="center">
+  <img src="evidence/10-gpu-inference/01-node-placement.png" width="95%" alt="GPU NodePool and inference Pod placement">
+</p>
+
+<p align="center">
+  <img src="evidence/10-gpu-inference/02-nvidia-runtime.png" width="82%" alt="Tesla T4 CUDA and EasyOCR model ready">
+</p>
+
 ### 2. 실제 OCR end-to-end 처리
 
 S3 presigned PUT으로 올린 실제 테스트 이미지를 `S3 ObjectCreated -> SQS -> analysis-worker -> inference-service -> score-service` 경로로 처리했다.
@@ -126,6 +134,10 @@ S3 presigned PUT으로 올린 실제 테스트 이미지를 `S3 ObjectCreated ->
 
 Grafana `BodyBuddy GPU Inference Overview`에서 DCGM GPU 사용률·메모리와 애플리케이션 inference 요청·지연을 같은 시간축으로 확인했다. 따라서 지연 증가가 GPU 포화인지, 모델 실행 외 구간인지 함께 판단할 수 있다.
 
+<p align="center">
+  <img src="evidence/10-gpu-inference/04-gpu-dashboard.png" width="95%" alt="GPU inference Grafana dashboard">
+</p>
+
 ### 4. 분산 trace로 지연 분해
 
 Tempo trace `edf64afcecb5e01c6de7979b1a019c83`에서 총 8개 span을 확인했다.
@@ -142,6 +154,10 @@ Tempo trace `edf64afcecb5e01c6de7979b1a019c83`에서 총 8개 span을 확인했�
 | notification enqueue | 42.1 ms |
 
 이 trace에서는 OCR runtime 구간이 critical path 대부분을 차지하고 DB write는 5ms 미만이었다. S3 ObjectCreated 이벤트는 upstream trace context를 전달하지 않으므로 trace root는 `analysis-worker`에서 시작한다. user-service까지 하나의 연속 trace로 보인다고 과장하지 않는다.
+
+<p align="center">
+  <img src="evidence/10-gpu-inference/05-tempo-trace.png" width="95%" alt="GPU inference Tempo trace waterfall">
+</p>
 
 ### 5. GPU 장애 격리와 fallback
 
@@ -166,6 +182,26 @@ GPU 서비스 장애를 숨기는 것이 아니라 로그·메트릭에는 failu
 - scale-down 이후 Karpenter 회수 판단까지 5분 18초가 걸려 설정한 `consolidateAfter: 5m`과 일치했다.
 - NodeClaim 생성부터 termination 시작까지 GPU 노드는 약 58분 47초 사용됐다. AWS 청구 확정값은 Cost Explorer 반영 후 별도로 확인한다.
 
+## Teardown 검증
+
+GPU 드릴 종료 후 전체 dev 환경을 `terraform destroy`하고 Terraform state와 AWS API를 교차 확인했다.
+
+| 확인 항목 | 종료 후 상태 |
+|---|---|
+| Terraform state | 0 resources |
+| EKS cluster | 0 |
+| running/stopped BodyBuddy EC2 | 0 |
+| ALB/NLB | 0 |
+| NAT Gateway | 0 |
+| RDS instance | 0 |
+| ElastiCache replication group | 0 |
+| dev ECR repository | 0 |
+| `bodybuddy-dev-inbody` S3 bucket | 제거 완료 |
+
+공용 Terraform state 버킷 `bodybuddy-tfstate-902371998304`와 lock table `bodybuddy-tflock`만 의도적으로 유지했다.
+
+첫 destroy에서는 Kubernetes controller가 만든 ALB와 Karpenter NodeClaim 3대가 Terraform state 밖에 남아 VPC 삭제를 막았다. BodyBuddy 태그와 ARN/instance ID를 확인해 해당 리소스만 제거했다. 또한 이미지가 든 ECR과 Governance Object Lock이 적용된 S3 버전은 destroy 전에 비워야 함을 확인했다. 다음 드릴에서는 `Ingress -> NodeClaim -> ECR image -> S3 version -> terraform destroy` 순서의 pre-destroy 절차를 사용한다.
+
 ## 드릴 중 발견하고 보완한 운영 이슈
 
 | 증상 | 원인 | 조치 |
@@ -180,11 +216,11 @@ GPU 서비스 장애를 숨기는 것이 아니라 로그·메트릭에는 failu
 
 이미지는 `bodybuddy-infra/reports/evidence/10-gpu-inference/`에 아래 이름으로 저장한다.
 
-1. `01-node-placement.png`: GPU NodePool과 inference Pod 배치
-2. `02-nvidia-runtime.png`: `nvidia-smi`와 EasyOCR CUDA startup 로그
+1. `01-node-placement.png`: GPU NodePool과 inference Pod 배치 (수집 완료)
+2. `02-nvidia-runtime.png`: `nvidia-smi`와 EasyOCR CUDA startup 로그 (수집 완료)
 3. `03-e2e-worker-dlq.png`: GPU OCR 성공 로그와 queue/DLQ 0건
-4. `04-gpu-dashboard.png`: GPU utilization, memory, inference requests/latency
-5. `05-tempo-trace.png`: 8-span waterfall과 Tesla T4/model attribute
+4. `04-gpu-dashboard.png`: GPU utilization, memory, inference requests/latency (수집 완료)
+5. `05-tempo-trace.png`: 8-span waterfall과 주요 구간 지연 (수집 완료)
 6. `06-fallback.png`: connection failure 이후 mock fallback 성공
 7. `07-scale-to-zero.png`: inference `0/0`과 GPU NodeClaim 제거
 
