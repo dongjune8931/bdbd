@@ -92,19 +92,16 @@ func ParseOCRLines(lines []OCRTextLine) (OCRResult, error) {
 }
 
 func findOCRMetric(lines []OCRTextLine, metric ocrMetricDefinition) (float64, bool) {
-	for index, line := range lines {
-		normalized := strings.ToLower(strings.TrimSpace(line.Text))
-		for _, label := range metric.labels {
-			labelIndex := strings.Index(normalized, label)
-			if labelIndex < 0 {
-				continue
-			}
-
-			if value, ok := firstValidNumber(normalized[labelIndex+len(label):], metric.min, metric.max); ok {
-				return value, true
-			}
-			for next := index + 1; next < len(lines) && next <= index+2; next++ {
-				if value, ok := firstValidNumber(lines[next].Text, metric.min, metric.max); ok {
+	for start := range lines {
+		window := ""
+		for end := start; end < len(lines) && end <= start+2; end++ {
+			window = strings.TrimSpace(window + " " + strings.ToLower(strings.TrimSpace(lines[end].Text)))
+			for _, label := range metric.labels {
+				labelIndex := strings.Index(window, label)
+				if labelIndex < 0 {
+					continue
+				}
+				if value, ok := firstValidNumber(window[labelIndex+len(label):], metric.min, metric.max); ok {
 					return value, true
 				}
 			}

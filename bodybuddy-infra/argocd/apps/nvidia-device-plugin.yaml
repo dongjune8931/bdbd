@@ -16,7 +16,16 @@ spec:
     targetRevision: 0.19.3
     helm:
       values: |
-        affinity: {}
+        # Do not depend on Node Feature Discovery for drill-only GPU nodes.
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: workload-type
+                      operator: In
+                      values:
+                        - gpu
         nodeSelector:
           workload-type: gpu
         tolerations:

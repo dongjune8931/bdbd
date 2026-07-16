@@ -39,11 +39,12 @@ func NewS3Presigner(ctx context.Context, region, endpoint, bucket string) (*S3Pr
 }
 
 // PresignUpload returns a PUT request that requires the declared image content type.
-func (p *S3Presigner) PresignUpload(ctx context.Context, key, contentType string, expires time.Duration) (*PresignedUpload, error) {
+func (p *S3Presigner) PresignUpload(ctx context.Context, key, contentType, contentMD5 string, expires time.Duration) (*PresignedUpload, error) {
 	request, err := p.client.PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(p.bucket),
 		Key:         aws.String(key),
 		ContentType: aws.String(contentType),
+		ContentMD5:  aws.String(contentMD5),
 	}, s3.WithPresignExpires(expires))
 	if err != nil {
 		return nil, fmt.Errorf("presigning S3 upload: %w", err)

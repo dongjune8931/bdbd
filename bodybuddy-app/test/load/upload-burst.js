@@ -32,6 +32,7 @@ function buildPayload() {
   const unique = `${__VU}-${__ITER}-${Date.now()}`;
   return JSON.stringify({
     filename: `load-upload-${unique}.jpg`,
+    checksum_md5: "1B2M2Y8AsgTpgAmY7PhCfg==",
   });
 }
 

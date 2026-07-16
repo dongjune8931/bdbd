@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -222,6 +223,7 @@ func getProfileHandler(pool *db.Pool) gin.HandlerFunc {
 type uploadRequest struct {
 	Filename    string `json:"filename" binding:"required"`
 	ContentType string `json:"content_type"`
+	ChecksumMD5 string `json:"checksum_md5" binding:"required"`
 }
 
 // createUploadHandler records an upload and returns a direct S3 PUT URL. The
@@ -248,6 +250,11 @@ func createUploadHandler(pool *db.Pool, presigner *storage.S3Presigner, metrics 
 			c.JSON(http.StatusBadRequest, gin.H{"error": "content_type must be an image"})
 			return
 		}
+		if !validContentMD5(req.ChecksumMD5) {
+			metrics.UploadRequestsTotal.WithLabelValues("rejected").Inc()
+			c.JSON(http.StatusBadRequest, gin.H{"error": "checksum_md5 must be a base64-encoded MD5 digest"})
+			return
+		}
 
 		_, err := pool.Exec(c.Request.Context(),
 			`INSERT INTO inbody_uploads (id, user_id, s3_key, status, idempotency_key)
@@ -261,7 +268,7 @@ func createUploadHandler(pool *db.Pool, presigner *storage.S3Presigner, metrics 
 			return
 		}
 
-		presigned, err := presigner.PresignUpload(c.Request.Context(), s3Key, contentType, 15*time.Minute)
+		presigned, err := presigner.PresignUpload(c.Request.Context(), s3Key, contentType, req.ChecksumMD5, 15*time.Minute)
 		if err != nil {
 			slog.Error("failed to presign upload", "upload_id", uploadID, "error", err)
 			metrics.UploadRequestsTotal.WithLabelValues("error").Inc()
@@ -281,10 +288,15 @@ func createUploadHandler(pool *db.Pool, presigner *storage.S3Presigner, metrics 
 			"status":             "awaiting_upload",
 			"upload_url":         presigned.URL,
 			"upload_method":      presigned.Method,
-			"upload_headers":     gin.H{"Content-Type": contentType},
+			"upload_headers":     gin.H{"Content-Type": contentType, "Content-MD5": req.ChecksumMD5},
 			"expires_in_seconds": 900,
 		})
 	}
+}
+
+func validContentMD5(value string) bool {
+	digest, err := base64.StdEncoding.DecodeString(value)
+	return err == nil && len(digest) == 16
 }
 
 var _ bbhttp.Pinger = (*db.Pool)(nil)

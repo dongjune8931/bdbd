@@ -58,6 +58,27 @@ func TestParseOCRLinesSplitEnglishLabels(t *testing.T) {
 	}
 }
 
+func TestParseOCRLinesFragmentedEnglishLabels(t *testing.T) {
+	result, err := ParseOCRLines([]OCRTextLine{
+		{Text: "Weight", Confidence: 0.99},
+		{Text: "72.4 kg", Confidence: 0.72},
+		{Text: "Skeletal", Confidence: 0.45},
+		{Text: "Muscle", Confidence: 0.99},
+		{Text: "Mass 34.8 kg", Confidence: 0.48},
+		{Text: "Percent Body", Confidence: 0.50},
+		{Text: "Fat", Confidence: 0.99},
+		{Text: "18.2", Confidence: 0.72},
+		{Text: "BMI", Confidence: 0.99},
+		{Text: "23.1", Confidence: 0.95},
+	})
+	if err != nil {
+		t.Fatalf("expected fragmented OCR result to parse, got error: %v", err)
+	}
+	if result.WeightKg != 72.4 || result.SkeletalMuscleKg != 34.8 || result.BodyFatPercent != 18.2 || result.BMI != 23.1 {
+		t.Fatalf("unexpected OCR result: %+v", result)
+	}
+}
+
 func TestParseOCRLinesRejectsMissingFields(t *testing.T) {
 	_, err := ParseOCRLines([]OCRTextLine{{Text: "Weight 68.5 kg", Confidence: 0.99}})
 	if err == nil {
